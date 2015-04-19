@@ -12,14 +12,15 @@ class LoadCompetition {
         $fileType = strtolower($fileType);
 
         //Если параметры не введены, или введены некорректно, выводим помощь
+        $helpString = "Первый аргумент: \n".
+            "    xml - получение xml файла\n".
+            "    json - получение json файла\n".
+            "Второй аргумент: \n".
+            "    db - сохранение в базу данных\n".
+            "    csv - сохранение в CSV файл\n".
+            "    dbcsv - сохранение и в базу данных, и в CSV файл";
         if ($this->safeType != "db" && $this->safeType != "csv" && $fileType != "xml" && $fileType != "json") {
-            echo $this->StringToConsole("Первый аргумент: \n");
-            echo $this->StringToConsole("    xml - получение xml файла\n");
-            echo $this->StringToConsole("    json - получение json файла\n");
-            echo $this->StringToConsole("Второй аргумент: \n");
-            echo $this->StringToConsole("    db - сохранение в базу данных\n");
-            echo $this->StringToConsole("    csv - сохранение в CSV файл\n");
-            echo $this->StringToConsole("    dbcsv - сохранение и в базу данных, и в CSV файл");
+            echo $this->StringToConsole($helpString);
         }
 
         //Проверим корректность второго аргумента
