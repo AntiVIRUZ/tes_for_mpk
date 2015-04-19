@@ -89,6 +89,16 @@ class LoadCompetition {
 
     private function XMLToArray($string) {
         //Парсим полученный XML в ассоциативный массив
+        //Запаковать в JSON а потом достать из него - самый простой способ получить массив,
+        //с такой же структурой, как при парсинге чистого JSON'a
+        $xml = new SimpleXMLElement($string);
+        $json = json_encode($xml);
+        $this->arr = json_decode($json, true);
+        
+        //Избавляемся от излишней вложенности, появляющейся из-за особенностей построения XML
+        $this->arr["sports_kinds"] = $this->arr["sports_kinds"]["sports_kind"];
+        $this->arr["teams"] = $this->arr["teams"]["team"];
+        $this->arr["participants"] = $this->arr["participants"]["participant"];
     }
 
     private function JSONToArray($string) {
