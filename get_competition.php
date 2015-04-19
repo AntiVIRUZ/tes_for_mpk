@@ -5,39 +5,67 @@ class LoadCompetition {
     //Код не является конечным, а лишь отражает логику работы программы
     
     private $safeType;
-            
-    function __construct($fileType="XML", $safeType="DB") {
+
+    function __construct($fileType = "help", $safeType = "help") {
         //Проверяем аргумент командной строки,
         //в зависимасти от него тянем XML или JSON
-        $this->safeType = $safeType;
-        if ($fileType == "XML") ProcessXML();
-        if ($fileType == "JSON") ProcessJSON();
+        $this->safeType = strtolower($safeType);
+        $fileType = strtolower($fileType);
+
+        //Если параметры не введены, или введены некорректно, выводим помощь
+        if ($this->safeType != "db" && $this->safeType != "csv" && $fileType != "xml" && $fileType != "json") {
+            echo $this->StringToConsole("Первый аргумент: \n");
+            echo $this->StringToConsole("    xml - получение xml файла\n");
+            echo $this->StringToConsole("    json - получение json файла\n");
+            echo $this->StringToConsole("Второй аргумент: \n");
+            echo $this->StringToConsole("    db - сохранение в базу данных\n");
+            echo $this->StringToConsole("    csv - сохранение в CSV файл\n");
+            echo $this->StringToConsole("    dbcsv - сохранение и в базу данных, и в CSV файл");
+        }
+
+        //Проверим корректность второго аргумента
+
+        if ($fileType == "xml") {
+            $this->ProcessXML();
+        } elseif ($fileType == "json") {
+            $this->ProcessJSON();
+        }
     }
-    
+
+    private function StringToConsole($string) {
+        //Меняем кодировку для корректного вывода кирилицы в консоль
+        return iconv('utf-8', 'CP866', $string);
+    }
+
     public function ProcessXML($safeType = "") {
         //Функция, инициализирующая загрузку и обработку XML документа
         //По умолчанию сохраняем в базу данных
-        if ($safeType != "") $this->safeType = $safeType;
         $XMLString = LoadXML();
         $arr = XMLToArray($XMLString);
         ProcessString($arr);
+        if ($safeType != "")
+            $this->safeType = $safeType;
     }
 
     public function ProcessJSON($safeType = "") {
         //Функция, инициализирующая загрузку и обработку JSON документа
         //По умолчанию сохраняем в базу данных
-        if ($safeType != "") $this->safeType = $safeType;
         $JSONString = LoadJSON();
         $arr = JSONToArray($JSONString);
         ProcessString($arr);
+        if ($safeType != "")
+            $this->safeType = $safeType;
     }
     
     private function ProcessString ($arr) {
         if (!VerifyArray($arr)) echo "Ошибка";
-        if ($this->safeType == "DB") {
-            SafeToDB($arr);
-        } elseif ($this->safeType == "CSV") {
-            SafeToCSV($arr);
+        if ($this->safeType == "db") {
+            SafeToDB();
+        } elseif ($this->safeType == "csv") {
+            SafeToCSV();
+        } else {
+            SafeToDB();
+            SafeToCSV();
         }
     }
 
