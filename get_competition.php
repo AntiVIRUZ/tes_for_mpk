@@ -111,6 +111,12 @@ class LoadCompetition {
         $this->arr["sports_kinds"] = $this->arr["sports_kinds"]["sports_kind"];
         $this->arr["teams"] = $this->arr["teams"]["team"];
         $this->arr["participants"] = $this->arr["participants"]["participant"];
+        foreach ($this->arr["participants"] as $key => $value) {
+            if (count($this->arr["participants"][$key]["teams"]["team_id"]) == 1)
+                $this->arr["participants"][$key]["teams"] = array($this->arr["participants"][$key]["teams"]["team_id"]);
+            else
+                $this->arr["participants"][$key]["teams"] = $this->arr["participants"][$key]["teams"]["team_id"];
+        }
     }
 
     private function JSONToArray($string) {
@@ -156,7 +162,8 @@ class LoadCompetition {
                 return "Для команды с id " . $value["id"] . " не существует вида спорта с id = " . $value["sports_kind_id"];
         }
 
-        foreach ($this->arr["participants"] as $value) {
+        foreach ($this->arr["participants"] as $key => $value) {
+            $unique_participant_to_team_id[$key] = array();
             if (!isset($value["id"]))
                 return "Есть учасник без id";
             if (isset($unique_participant_id[$value["id"]])) {
@@ -172,10 +179,10 @@ class LoadCompetition {
                     return "Среди команд участника с id " . $value["id"] . "есть пустые записи";
                 if (!isset($unique_teams_id[$team_id]))
                     return "Участник с id " . $value["id"] . " закреплен за несуществующей командой с id " . $team_id;
-                if (isset($unique_participant_to_team_id[$team_id]))
+                if (isset($unique_participant_to_team_id[$key][$team_id]))
                     return "Участник с id " . $value["id"] . " дважды прикреплен к команде с id ". $team_id;
                 else
-                    $unique_participant_to_team_id[$team_id] = 1;
+                    $unique_participant_to_team_id[$key][$team_id] = 1;
             }
         }
         return "ok";
