@@ -2,8 +2,14 @@
 
 class LoadCompetition {
     
+    //Тип сохранения - в базу данных или в CSV
     private $safeType;
+    
+    //Массив с распарсеными XML или JSON
     private $arr;
+    
+    //Соединение к БД MySQL
+    private $mysqliConnect;
 
     function __construct($fileType = "help", $safeType = "help") {
         //Проверяем аргумент командной строки,
@@ -206,11 +212,11 @@ class LoadCompetition {
         $password = "toor"; 
         
         // Создаем соединение
-        $conn = new mysqli($servername, $username, $password);
+        $this->mysqliConnect = new mysqli($servername, $username, $password);
         
         //Проверяем соединение
-        if ($conn->connect_error) {
-            die("Connection failed: " . $conn->connect_error);
+        if ($this->mysqliConnect->connect_error) {
+            die("Connection failed: " . $this->mysqliConnect->connect_error);
         }
     }
 
