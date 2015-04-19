@@ -2,7 +2,7 @@
 	"sports_kinds":[
 	{
 		"id": 1,
-		"name": "Волейбол"
+		"name": ""
 	},
 	{
 		"id": 2,

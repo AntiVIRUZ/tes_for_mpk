@@ -43,7 +43,7 @@ class LoadCompetition {
             $this->safeType = $safeType;
         $XMLString = $this->LoadXML();
         //Формируем из полученного документа ассоциативный массив
-        $this->arr = $this->XMLToArray($XMLString);
+        $this->XMLToArray($XMLString);
         $this->ProcessString();
     }
 
@@ -54,7 +54,7 @@ class LoadCompetition {
             $this->safeType = $safeType;
         $JSONString = $this->LoadJSON();
         //Формируем из полученного документа ассоциативный массив
-        $this->arr = $this->JSONToArray($JSONString);
+        $this->JSONToArray($JSONString);
         $this->ProcessString();
     }
 
