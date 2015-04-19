@@ -12,8 +12,11 @@ class LoadCompetition {
     
     //Соединение к БД MySQL
     private $mysqli;
-
-    function __construct($fileType = "help", $saveType = "help") {
+    
+    //Адресс, с которого подтягивается файл
+    private $url;
+    
+    function __construct($fileType = "help", $saveType = "help", $url = "") {
         //Проверяем аргумент командной строки,
         //в зависимасти от него тянем XML или JSON
         $this->saveType = strtolower($saveType);
@@ -38,8 +41,12 @@ class LoadCompetition {
         //Проверим корректность второго аргумента
 
         if ($fileType == "xml") {
+            if (!$url) $this->url = "http://mpk_server.local/get_xml.php";
+            else $this->url = $url;
             $this->ProcessXML();
         } elseif ($fileType == "json") {
+            if (!$url) $this->url = "http://mpk_server.local/get_json.php";
+            else $this->url = $url;
             $this->ProcessJSON();
         }
     }
@@ -54,7 +61,7 @@ class LoadCompetition {
         //По умолчанию сохраняем в базу данных
         if ($saveType != "")
             $this->saveType = $saveType;
-        $XMLString = $this->LoadXML();
+        $XMLString = $this->LoadFile();
         //Формируем из полученного документа ассоциативный массив
         $this->XMLToArray($XMLString);
         $this->ProcessString();
@@ -65,7 +72,7 @@ class LoadCompetition {
         //По умолчанию сохраняем в базу данных
         if ($saveType != "")
             $this->saveType = $saveType;
-        $JSONString = $this->LoadJSON();
+        $JSONString = $this->LoadFile();
         //Формируем из полученного документа ассоциативный массив
         $this->JSONToArray($JSONString);
         $this->ProcessString();
@@ -87,17 +94,12 @@ class LoadCompetition {
         }
     }
 
-    private function LoadXML() {
-        //Загружаем XML файл
-        $url = "http://mpk_server.local/get_xml.php";
-        $response = file_get_contents($url);
-        return $response;
-    }
-
-    private function LoadJSON() {
-        //Загружаем JSON файл
-        $url = "http://mpk_server.local/get_json.php";
-        $response = file_get_contents($url);
+    private function LoadFile() {
+        //Загружаем файл
+        $response = file_get_contents($this->url);
+        if ($response === FALSE){
+            die($this->StringToConsole("Неверный URL"));
+        }
         return $response;
     }
 
@@ -328,11 +330,11 @@ class LoadCompetition {
 
 //Инициализируем класс, получая из командной строки аргумент обработки XML или JSON
 //По умолчанию загружаем XML и соханяем в DB
-if ($argc == 1) {
+if ($argc < 3) {
     $class = new LoadCompetition();
-} elseif ($argc == 2) {
-    $class = new LoadCompetition($argv[1]);
-} else {
+} elseif ($argc == 3) {
     $class = new LoadCompetition($argv[1], $argv[2]);
+} else {
+    $class = new LoadCompetition($argv[1], $argv[2], $argv[3]);
 }
 ?>
