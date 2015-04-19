@@ -19,7 +19,7 @@ class LoadCompetition {
         $this->saveType = strtolower($saveType);
         
         //Если сохраняем в MySQL, то сразу пытаемся создать соединениеЫ
-        if ($this->saveType == "db") $this->ConnectToDB();
+        if ($this->saveType == "db" || $this->saveType == "dbcsv") $this->ConnectToDB();
         
         $fileType = strtolower($fileType);
 
@@ -253,8 +253,8 @@ class LoadCompetition {
         $i = 1;
         foreach ($this->arr["participants"] as $key => $value)
         foreach ($value["teams"] as $team_key => $team_value) {
-            $i++;
             $sql .= "(".$i.", ".$value["id"].", ".$team_value."),\n";
+            $i++;
         }
         $sql[strlen($sql)-2] = ";";
         $this->SentQuery($sql);
@@ -282,6 +282,31 @@ class LoadCompetition {
     
     private function SaveToCSV() {
         //Сохраняем информацию в CSV файл
+        //Сохраняю в 4 различных файла аналогично таблицам базы данных
+        $SKfile = fopen("sports_kinds.csv", "w");
+        foreach ($this->arr["sports_kinds"] as $key => $value){
+            fwrite($SKfile, $value["id"].";\"".$value["name"]."\"\n");
+        }
+        fclose($SKfile);
+        
+        $Tfile = fopen("teams.csv", "w");
+        foreach ($this->arr["teams"] as $key => $value){
+            fwrite($Tfile, $value["id"].";\"".$value["name"]."\",".$value["sports_kind_id"]."\n");
+        }
+        fclose($Tfile);
+        
+        $Pfile = fopen("participants.csv", "w");
+        foreach ($this->arr["participants"] as $key => $value){
+            fwrite($Pfile, $value["id"].";\"".$value["name"]."\"\n");
+        }
+        fclose($Pfile);
+        
+        $PTfile = fopen("participants to teams.csv", "w");
+        foreach ($this->arr["participants"] as $key => $value)
+        foreach ($value["teams"] as $team_value) {
+            fwrite($PTfile, $value["id"].";".$team_value."\n");
+        }
+        fclose($PTfile);
     }
     
     private function ConnectToDB() {
