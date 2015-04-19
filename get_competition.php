@@ -33,7 +33,9 @@ class LoadCompetition {
             "Второй аргумент: \n".
             "    db - сохранение в базу данных\n".
             "    csv - сохранение в CSV файл\n".
-            "    dbcsv - сохранение и в базу данных, и в CSV файл";
+            "    dbcsv - сохранение и в базу данных, и в CSV файл".
+            "Третий аргумент (не обязательный):".
+            "    <url> - адресс, с которого нужно загрузить файл XML или JSON";
         if ($this->saveType != "db" && $this->saveType != "csv" && $fileType != "xml" && $fileType != "json") {
             echo $this->StringToConsole($helpString);
         }
