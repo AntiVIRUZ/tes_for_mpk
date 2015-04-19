@@ -9,6 +9,10 @@ class LoadCompetition {
         //Проверяем аргумент командной строки,
         //в зависимасти от него тянем XML или JSON
         $this->safeType = strtolower($safeType);
+        
+        //Если сохраняем в MySQL, то сразу пытаемся создать соединениеЫ
+        if ($this->safeType == "db") $this->ConnectToDB();
+        
         $fileType = strtolower($fileType);
 
         //Если параметры не введены, или введены некорректно, выводим помощь
@@ -194,6 +198,20 @@ class LoadCompetition {
 
     private function SafeToCSV() {
         //Сохраняем информацию в CSV файл
+    }
+    
+    private function ConnectToDB() {
+        $servername = "localhost";
+        $username = "root";
+        $password = "toor"; 
+        
+        // Создаем соединение
+        $conn = new mysqli($servername, $username, $password);
+        
+        //Проверяем соединение
+        if ($conn->connect_error) {
+            die("Connection failed: " . $conn->connect_error);
+        }
     }
 
 }
