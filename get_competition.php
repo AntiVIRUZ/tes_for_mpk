@@ -2,22 +2,24 @@
 
 class LoadCompetition {
     
+    
+    
     //Тип сохранения - в базу данных или в CSV
-    private $safeType;
+    private $saveType;
     
     //Массив с распарсеными XML или JSON
     private $arr;
     
     //Соединение к БД MySQL
-    private $mysqliConnect;
+    private $mysqli;
 
-    function __construct($fileType = "help", $safeType = "help") {
+    function __construct($fileType = "help", $saveType = "help") {
         //Проверяем аргумент командной строки,
         //в зависимасти от него тянем XML или JSON
-        $this->safeType = strtolower($safeType);
+        $this->saveType = strtolower($saveType);
         
         //Если сохраняем в MySQL, то сразу пытаемся создать соединениеЫ
-        if ($this->safeType == "db") $this->ConnectToDB();
+        if ($this->saveType == "db") $this->ConnectToDB();
         
         $fileType = strtolower($fileType);
 
@@ -29,7 +31,7 @@ class LoadCompetition {
             "    db - сохранение в базу данных\n".
             "    csv - сохранение в CSV файл\n".
             "    dbcsv - сохранение и в базу данных, и в CSV файл";
-        if ($this->safeType != "db" && $this->safeType != "csv" && $fileType != "xml" && $fileType != "json") {
+        if ($this->saveType != "db" && $this->saveType != "csv" && $fileType != "xml" && $fileType != "json") {
             echo $this->StringToConsole($helpString);
         }
 
@@ -47,22 +49,22 @@ class LoadCompetition {
         return iconv('utf-8', 'CP866', $string);
     }
 
-    public function ProcessXML($safeType = "") {
+    public function ProcessXML($saveType = "") {
         //Функция, инициализирующая загрузку и обработку XML документа
         //По умолчанию сохраняем в базу данных
-        if ($safeType != "")
-            $this->safeType = $safeType;
+        if ($saveType != "")
+            $this->saveType = $saveType;
         $XMLString = $this->LoadXML();
         //Формируем из полученного документа ассоциативный массив
         $this->XMLToArray($XMLString);
         $this->ProcessString();
     }
 
-    public function ProcessJSON($safeType = "") {
+    public function ProcessJSON($saveType = "") {
         //Функция, инициализирующая загрузку и обработку JSON документа
         //По умолчанию сохраняем в базу данных
-        if ($safeType != "")
-            $this->safeType = $safeType;
+        if ($saveType != "")
+            $this->saveType = $saveType;
         $JSONString = $this->LoadJSON();
         //Формируем из полученного документа ассоциативный массив
         $this->JSONToArray($JSONString);
@@ -75,14 +77,13 @@ class LoadCompetition {
             echo $this->StringToConsole("Ошибка, неверно сформирован полученный файл\n" . $error_str);
             die;
         }
-        die;
-        if ($this->safeType == "db") {
-            SafeToDB();
-        } elseif ($this->safeType == "csv") {
-            SafeToCSV();
+        if ($this->saveType == "db") {
+            $this->SaveToDB();
+        } elseif ($this->saveType == "csv") {
+            $this->SaveToCSV();
         } else {
-            SafeToDB();
-            SafeToCSV();
+            $this->SaveToDB();
+            $this->SaveToCSV();
         }
     }
 
@@ -198,11 +199,88 @@ class LoadCompetition {
         return "ok";
     }
 
-    private function SafeToDB() {
+    private function SaveToDB() {
         //Сохранение информации в базу данных
+        //Добавляем записи в таблицы
+        //Формирую инсерт харкодом, так как при такой малой таблице и конкретной задаче
+        //делать расширяемый код общего вида, так сказать, считаю неэффективным
+        
+        $this->ClearTables();
+        
+        $sql = "INSERT INTO sports_kinds (id, name)\n" .
+                "VALUES\n";
+        
+        //Запоминаем количество записей, чтобы после последней поставить ;
+        $recordsCount = count($this->arr["sports_kinds"]);
+        foreach ($this->arr["sports_kinds"] as $key => $value){
+            $sql .= "(".$value["id"].", '".$value["name"]."')";
+            if ($key + 1 == $recordsCount)
+                $sql .= ";\n";
+            else
+                $sql .= ",\n";
+        }
+        $this->SentQuery($sql);
+        
+        $sql = "INSERT INTO teams (id, name, sports_kind_id)\n" .
+                "VALUES\n";
+        
+        $recordsCount = count($this->arr["teams"]);
+        foreach ($this->arr["teams"] as $key => $value){
+            $sql .= "(".$value["id"].", '".$value["name"]."', ".$value["sports_kind_id"].")";
+            if ($key + 1 == $recordsCount)
+                $sql .= ";\n";
+            else
+                $sql .= ",\n";
+        }
+        $this->SentQuery($sql);
+        
+        $sql = "INSERT INTO participants (id, name)\n" .
+                "VALUES\n";
+        
+        $recordsCount = count($this->arr["participants"]);
+        foreach ($this->arr["participants"] as $key => $value){
+            $sql .= "(".$value["id"].", '".$value["name"]."')";
+            if ($key + 1 == $recordsCount)
+                $sql .= ";\n";
+            else
+                $sql .= ",\n";
+        }
+        $this->SentQuery($sql);
+        
+        $sql = "INSERT INTO participants_teams (id, participant_id, team_id)\n" .
+                "VALUES\n";
+        
+        $i = 1;
+        foreach ($this->arr["participants"] as $key => $value)
+        foreach ($value["teams"] as $team_key => $team_value) {
+            $i++;
+            $sql .= "(".$i.", ".$value["id"].", ".$team_value."),\n";
+        }
+        $sql[strlen($sql)-2] = ";";
+        $this->SentQuery($sql);
     }
-
-    private function SafeToCSV() {
+    
+    private function ClearTables() {
+        //Очистим таблицы, если там есть данные
+        $sql = "DELETE FROM participants_teams;\n";
+        $this->SentQuery($sql);
+        
+        $sql = "DELETE FROM participants;\n";
+        $this->SentQuery($sql);
+        
+        $sql = "DELETE FROM teams;\n";
+        $this->SentQuery($sql);
+        
+        $sql = "DELETE FROM sports_kinds;\n";
+        $this->SentQuery($sql);
+    }
+         
+    private function SentQuery($sql) {
+        if ($this->mysqli->query($sql) === FALSE)
+            die($this->StringToConsole($this->mysqli->error));
+    }
+    
+    private function SaveToCSV() {
         //Сохраняем информацию в CSV файл
     }
     
@@ -212,14 +290,15 @@ class LoadCompetition {
         $password = "toor"; 
         
         // Создаем соединение
-        $this->mysqliConnect = new mysqli($servername, $username, $password);
+        $this->mysqli = new mysqli($servername, $username, $password);
         
         //Проверяем соединение
-        if ($this->mysqliConnect->connect_error) {
-            die("Connection failed: " . $this->mysqliConnect->connect_error);
+        if ($this->mysqli->connect_error) {
+            die("Connection failed: " . $this->mysqli->connect_error);
         }
+        
+        $this->mysqli->select_db("mpk_test");
     }
-
 }
 
 //Инициализируем класс, получая из командной строки аргумент обработки XML или JSON
