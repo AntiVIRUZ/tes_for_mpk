@@ -93,6 +93,7 @@ class LoadCompetition {
 
     private function JSONToArray($string) {
         //Парсим полученный JSON в ассоциативный массив
+        $this->arr = json_decode($string, true);
     }
 
     private function VerifyArray() {
