@@ -59,10 +59,12 @@ class LoadCompetition {
     }
 
     private function ProcessString() {
-        if (!$this->VerifyArray()) {
-            echo $this->StringToConsole("Ошибка, неверно сформирован массив\nПолученный файл был отформатирован или заполнен данными некорректно\n");
+        $error_str = $this->VerifyArray();
+        if ($error_str != "ok") {
+            echo $this->StringToConsole("Ошибка, неверно сформирован полученный файл\n" . $error_str);
             die;
         }
+        die;
         if ($this->safeType == "db") {
             SafeToDB();
         } elseif ($this->safeType == "csv") {
@@ -91,10 +93,19 @@ class LoadCompetition {
         //Парсим полученный XML в ассоциативный массив
         //Запаковать в JSON а потом достать из него - самый простой способ получить массив,
         //с такой же структурой, как при парсинге чистого JSON'a
-        $xml = new SimpleXMLElement($string);
+        try {
+            $xml = new SimpleXMLElement($string);
+        } catch (Exception $exc) {
+            echo $this->StringToConsole("Ошибка, неверно сформирован полученный файл\nXML имеет синтаксические ошибки");
+            die;
+        }
         $json = json_encode($xml);
         $this->arr = json_decode($json, true);
-        
+        if ($this->arr === NULL) {
+            echo $this->StringToConsole("Ошибка, неверно сформирован полученный файл\nXML имеет синтаксические ошибки");
+            die;
+        }
+
         //Избавляемся от излишней вложенности, появляющейся из-за особенностей построения XML
         $this->arr["sports_kinds"] = $this->arr["sports_kinds"]["sports_kind"];
         $this->arr["teams"] = $this->arr["teams"]["team"];
@@ -104,10 +115,69 @@ class LoadCompetition {
     private function JSONToArray($string) {
         //Парсим полученный JSON в ассоциативный массив
         $this->arr = json_decode($string, true);
+        if ($this->arr === null) {
+            echo $this->StringToConsole("Ошибка, неверно сформирован полученный файл\nJSON имеет синтаксические ошибки");
+            die;
+        }
     }
 
     private function VerifyArray() {
         //Функция, проверяющая корректность сформированного массива
+        $unique_sports_id = array();
+        $unique_teams_id = array();
+        $unique_participant_id = array();
+        $unique_participant_to_team_id = array();
+
+        //Проверяем уникальность ID и наличие данных в каждом поле
+        foreach ($this->arr["sports_kinds"] as $value) {
+            if (!isset($value["id"]))
+                return "Есть вид спорта без id";
+            if (isset($unique_sports_id[$value["id"]])) {
+                return "Среди видов спорта есть неуникальный id (" . $value["id"] . ")";
+            } else
+                $unique_sports_id[$value["id"]] = 1;
+            if (!$value["name"])
+                return "У вида спорта с id " . $value["id"] . " нет имени";
+        }
+
+        foreach ($this->arr["teams"] as $value) {
+            if (!isset($value["id"]))
+                return "Есть команда без id";
+            if (isset($unique_teams_id[$value["id"]])) {
+                return "Среди команд есть неуникальный id (" . $value["id"] . ")";
+            } else
+                $unique_teams_id[$value["id"]] = 1;
+            if (!$value["name"])
+                return "У команды с id " . $value["id"] . " нет имени";
+            if (!$value["sports_kind_id"])
+                return "Для команды с id " . $value["id"] . " не закреплен вид спорта";
+            if (!isset($unique_sports_id[$value["sports_kind_id"]]))
+                return "Для команды с id " . $value["id"] . " не существует вида спорта с id = " . $value["sports_kind_id"];
+        }
+
+        foreach ($this->arr["participants"] as $value) {
+            if (!isset($value["id"]))
+                return "Есть учасник без id";
+            if (isset($unique_participant_id[$value["id"]])) {
+                return "Среди команд есть неуникальный id (" . $value["id"] . ")";
+            } else
+                $unique_participant_id[$value["id"]] = 1;
+            if (!$value["name"])
+                return "У участника с id " . $value["id"] . " нет имени";
+            if (count($value["teams"]) == 0)
+                return "Участник с id " . $value["id"] . " не закреплен ни за одной командой";
+            foreach ($value["teams"] as $team_id) {
+                if ($team_id == "")
+                    return "Среди команд участника с id " . $value["id"] . "есть пустые записи";
+                if (!isset($unique_teams_id[$team_id]))
+                    return "Участник с id " . $value["id"] . " закреплен за несуществующей командой с id " . $team_id;
+                if (isset($unique_participant_to_team_id[$team_id]))
+                    return "Участник с id " . $value["id"] . " дважды прикреплен к команде с id ". $team_id;
+                else
+                    $unique_participant_to_team_id[$team_id] = 1;
+            }
+        }
+        return "ok";
     }
 
     private function SafeToDB() {
