@@ -1,10 +1,9 @@
 <?php
 
 class LoadCompetition {
-
-    //Код не является конечным, а лишь отражает логику работы программы
     
     private $safeType;
+    private $arr;
 
     function __construct($fileType = "help", $safeType = "help") {
         //Проверяем аргумент командной строки,
@@ -40,25 +39,30 @@ class LoadCompetition {
     public function ProcessXML($safeType = "") {
         //Функция, инициализирующая загрузку и обработку XML документа
         //По умолчанию сохраняем в базу данных
-        $XMLString = LoadXML();
-        $arr = XMLToArray($XMLString);
-        ProcessString($arr);
         if ($safeType != "")
             $this->safeType = $safeType;
+        $XMLString = $this->LoadXML();
+        //Формируем из полученного документа ассоциативный массив
+        $this->arr = $this->XMLToArray($XMLString);
+        $this->ProcessString();
     }
 
     public function ProcessJSON($safeType = "") {
         //Функция, инициализирующая загрузку и обработку JSON документа
         //По умолчанию сохраняем в базу данных
-        $JSONString = LoadJSON();
-        $arr = JSONToArray($JSONString);
-        ProcessString($arr);
         if ($safeType != "")
             $this->safeType = $safeType;
+        $JSONString = $this->LoadJSON();
+        //Формируем из полученного документа ассоциативный массив
+        $this->arr = $this->JSONToArray($JSONString);
+        $this->ProcessString();
     }
-    
-    private function ProcessString ($arr) {
-        if (!VerifyArray($arr)) echo "Ошибка";
+
+    private function ProcessString() {
+        if (!$this->VerifyArray()) {
+            echo $this->StringToConsole("Ошибка, неверно сформирован массив\nПолученный файл был отформатирован или заполнен данными некорректно\n");
+            die;
+        }
         if ($this->safeType == "db") {
             SafeToDB();
         } elseif ($this->safeType == "csv") {
@@ -71,10 +75,16 @@ class LoadCompetition {
 
     private function LoadXML() {
         //Загружаем XML файл
+        $url = "http://mpk_server.local/get_xml.php";
+        $response = file_get_contents($url);
+        return $response;
     }
 
     private function LoadJSON() {
         //Загружаем JSON файл
+        $url = "http://mpk_server.local/get_json.php";
+        $response = file_get_contents($url);
+        return $response;
     }
 
     private function XMLToArray($string) {
@@ -85,30 +95,27 @@ class LoadCompetition {
         //Парсим полученный JSON в ассоциативный массив
     }
 
-    private function VerifyArray($arr) {
+    private function VerifyArray() {
         //Функция, проверяющая корректность сформированного массива
     }
-    
-    private function SafeToDB($arr) {
+
+    private function SafeToDB() {
         //Сохранение информации в базу данных
     }
-    
-    private function SafeToCSV($arr) {
+
+    private function SafeToCSV() {
         //Сохраняем информацию в CSV файл
     }
+
 }
 
 //Инициализируем класс, получая из командной строки аргумент обработки XML или JSON
 //По умолчанию загружаем XML и соханяем в DB
 if ($argc == 1) {
     $class = new LoadCompetition();
-} 
-elseif ($argc == 2) {
+} elseif ($argc == 2) {
     $class = new LoadCompetition($argv[1]);
-}
-else {
+} else {
     $class = new LoadCompetition($argv[1], $argv[2]);
 }
-
-
 ?>
