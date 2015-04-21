@@ -4,7 +4,7 @@ include 'ParserAbstract.php';
 include 'FilesLoader.php';
 
 class XMLParser extends ParserAbstract {
-    
+
     public function parseFromString($xmlString) {
         try {
             $xml = new SimpleXMLElement($xmlString);
@@ -24,10 +24,12 @@ class XMLParser extends ParserAbstract {
             else
                 $value["teams"] = $value["teams"]["team_id"];
         }
-        
+        if (!VerifyArray($result)) {
+            trigger_error($this->lastError, E_USER_ERROR);
+        }
         return $result;
     }
-    
+
 }
 
 ?>
