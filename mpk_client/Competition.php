@@ -47,8 +47,14 @@ class Competition {
         }
     }
     
-    public function CreateConnectionToDB($servername, $username, $password) {
-        if (!$this->DBSaver->ConnectToDB($servername, $username, $password)) {
+    public function CreateConnectionToDB() {
+        if (!$this->DBSaver->ConnectToDB()) {
+            echo "Ошибка подключения к базе данных: ". $this->DBSaver->GetLastError();
+        }
+    }
+    
+    public function CreateConnectionToSpecificDB($servername, $username, $password) {
+        if (!$this->DBSaver->ConnectToSpecificBD($servername, $username, $password)) {
             echo "Ошибка подключения к базе данных: ". $this->DBSaver->GetLastError();
         }
     }

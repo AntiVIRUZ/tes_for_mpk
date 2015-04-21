@@ -1,6 +1,7 @@
 <?php
 
 include_once 'iSaver.php';
+include_once 'DBSettings.php';
 
 class DBSaver implements iSaver {
 
@@ -8,9 +9,11 @@ class DBSaver implements iSaver {
     private $lastError;
     private $mysqli;
     private $connectionStatus;
+    private $dbSettings;
     
     function __construct() {
         $this->connectionStatus = false;
+        $this->dbSettings = new DBSettings();
     }
     
     public function GetConnectionStatus() {
@@ -70,7 +73,12 @@ class DBSaver implements iSaver {
         return $this->SentQuery($sql);
     }
     
-    public function ConnectToDB ($servername, $username, $password) {
+    public function ConnectToDB () {
+        return $this->ConnectToSpecificBD($this->dbSettings->getServername(), $this->dbSettings->getUsername(), $this->dbSettings->getPassword());
+    }
+    
+    public function ConnectToSpecificBD($servername, $username, $password)
+    {
         if ($this->connectionStatus) {
             $this->DisconnectFromDB();
         }
