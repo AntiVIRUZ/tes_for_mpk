@@ -6,8 +6,7 @@ class CSVSaver extends iSaver {
 
     private $participants;
     
-    function __construct($participants) {
-        $this->SetParticipants($participants);
+    function __construct() {
     }
     
     public function SetParticipants($participants) {

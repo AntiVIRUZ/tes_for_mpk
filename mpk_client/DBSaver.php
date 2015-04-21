@@ -8,8 +8,7 @@ class DBSaver extends iSaver {
     private $lastError;
     private $mysqli;
     
-    function __construct($participants) {
-        $this->participants = $participants;
+    function __construct() {
     }
 
     public function SetParticipants($participants) {
