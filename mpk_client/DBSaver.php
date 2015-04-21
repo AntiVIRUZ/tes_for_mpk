@@ -7,13 +7,22 @@ class DBSaver implements iSaver {
 
     private $participants;
     private $lastError;
-    private $mysqli;
+    private $pdo;
     private $connectionStatus;
     private $dbSettings;
     
+    private $primaryKeyStartValue = array();
+    
+    private $tables = array( "sports_kinds", "participants", "teams", "participants_teams");
+    
     function __construct() {
         $this->connectionStatus = false;
-        $this->dbSettings = new DBSettings();
+        try {
+            $this->dbSettings = new DBSettings();
+        } catch (Exception $e) {
+            //@TODO Добавить логирование
+            die($e->getMessage());
+        }
     }
     
     public function GetConnectionStatus() {
@@ -74,25 +83,32 @@ class DBSaver implements iSaver {
     }
     
     public function ConnectToDB () {
-        return $this->ConnectToSpecificBD($this->dbSettings->getServername(), $this->dbSettings->getUsername(), $this->dbSettings->getPassword());
+        return $this->ConnectToSpecificBD($this->dbSettings->getDbType(), $this->dbSettings->getServername(), $this->dbSettings->getUsername(), $this->dbSettings->getPassword(), $this->dbSettings->getDatabase);
     }
     
-    public function ConnectToSpecificBD($servername, $username, $password)
+    public function ConnectToSpecificBD($dbType, $servername, $username, $password, $database)
     {
+        if (!checkSupportingDBDriver($this->dbSettings->getDbType())) {
+            trigger_error("Драйвер базы данных не поддерживается или указан неверно", E_USER_ERROR);
+        }
+        
         if ($this->connectionStatus) {
             $this->DisconnectFromDB();
         }
         
-        $this->mysqli = new mysqli($servername, $username, $password);
+        $connectionString = $this->dbSettings->getDbType() . ":";
+        $connectionString .= "host=" . $servername;
         
-        //Проверяем соединение
-        if ($this->mysqli->connect_error) {
-            $this->lastError = "Connection failed: " . $this->mysqli->connect_error;
-            return false;
+        try {
+            $this->pdo = new PDO($connectionString, $username, $password);
+        } catch (Exception $e) {
+            //@TODO Добавить логирование
+            $this->lastError = $e->getMessage();
+            return FAlSE;
         }
         
-        if ( $this->CreateDatabaseIfNotExists() ) {
-            $this->mysqli->select_db("mpk_test");
+        if ( $this->CreateDatabaseIfNotExists($database) ) {
+            $this->SelectDatabase($database);
             $this->CreateTables();
         } else {
             return false;
@@ -101,19 +117,28 @@ class DBSaver implements iSaver {
         return true;
     }
     
+    public function SelectDatabase($name) {
+        return $this->SentQuery("use " . $name . ";");
+    }
+    
+    private function checkSupportingDBDriver($driverName) {
+        $avaiableDrivers = PDO::getAvailableDrivers();
+        if (in_array($driverName, $avaiableDrivers)) {
+            return TRUE;
+        } else {
+            return FALSE;
+        }
+    }
+    
     private function DisconnectFromDB () {
-        $this->mysqli->close();
+        $this->pdo = NULL;
     }
     
-    private function CreateDatabaseIfNotExists() {
-        $sql = "CREATE DATABASE IF NOT EXISTS mpk_test CHARACTER SET utf8 COLLATE utf8_general_ci;";
-        return $this->SentQuery($sql);
-        
+    private function CreateDatabaseIfNotExists($database) {
+        return SentQuery("CREATE DATABASE IF NOT EXISTS `". $database . "` CHARACTER SET utf8 COLLATE utf8_general_ci;");
     }
     
-    private function CreateTables() {        
-        $sql = "DROP TABLE IF EXISTS `sports_kinds`;"; 
-        $this->SentQuery($sql);
+    private function CreateTables() {
         
         $sql = "CREATE TABLE IF NOT EXISTS `sports_kinds` (
                   `id` int(11) NOT NULL AUTO_INCREMENT,
@@ -122,17 +147,11 @@ class DBSaver implements iSaver {
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;";
         $this->SentQuery($sql);
         
-        $sql = "DROP TABLE IF EXISTS `participants`;";
-        $this->SentQuery($sql);
-        
         $sql = "CREATE TABLE IF NOT EXISTS `participants` (
                   `id` int(11) NOT NULL AUTO_INCREMENT,
                   `name` varchar(50) NOT NULL,
                   PRIMARY KEY (`id`)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;";
-        $this->SentQuery($sql);
-        
-        $sql = "DROP TABLE IF EXISTS `teams`;";
         $this->SentQuery($sql);
         
         $sql = "CREATE TABLE IF NOT EXISTS `teams` (
@@ -143,9 +162,6 @@ class DBSaver implements iSaver {
                   KEY `t2sk` (`sports_kind_id`),
                   CONSTRAINT `t2sk` FOREIGN KEY (`sports_kind_id`) REFERENCES `sports_kinds` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;";
-        $this->SentQuery($sql);
-        
-        $sql = "DROP TABLE IF EXISTS `participants_teams`;";
         $this->SentQuery($sql);
         
         $sql = "CREATE TABLE IF NOT EXISTS `participants_teams` (
@@ -162,21 +178,12 @@ class DBSaver implements iSaver {
     }
     
     private function SentQuery($sql) {
-        if ($this->mysqli->query($sql) === FALSE) {
-            $this->lastError = $this->mysqli->error;
-            return FALSE;
-        } else {
-            return true;
+        $sth = $this->pdo->prepare($sql);
+        $result = $sth->execute();
+        if (!$result) {
+            $this->lastError = $this->pdo->errorInfo();
         }
-    }
-    
-    private function SentMultyQuery($sql) {
-        if ($this->mysqli->multi_query($sql) === FALSE) {
-            $this->lastError = $this->mysqli->error;
-            return FALSE;
-        } else {
-            return true;
-        }
+        return $result;
     }
     
     function __destruct() {
