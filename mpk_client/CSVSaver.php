@@ -1,8 +1,8 @@
 <?php
 
-include 'iSaver.php';
+include_once 'iSaver.php';
 
-class CSVSaver extends iSaver {
+class CSVSaver implements iSaver {
 
     private $participants;
     

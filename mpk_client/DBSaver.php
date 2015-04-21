@@ -1,14 +1,24 @@
 <?php
 
-include 'iSaver.php';
+include_once 'iSaver.php';
 
-class DBSaver extends iSaver {
+class DBSaver implements iSaver {
 
     private $participants;
     private $lastError;
     private $mysqli;
+    private $connectionStatus;
     
     function __construct() {
+        $this->connectionStatus = false;
+    }
+    
+    public function GetConnectionStatus() {
+        return $this->connectionStatus;
+    }
+    
+    public function GetLastError() {
+        return $this->lastError;
     }
 
     public function SetParticipants($participants) {
@@ -57,11 +67,13 @@ class DBSaver extends iSaver {
             $i++;
         }
         $sql[strlen($sql)-2] = ";";
-        $this->SentQuery($sql);
+        return $this->SentQuery($sql);
     }
     
     public function ConnectToDB ($servername, $username, $password) {
-        $this->DisconnectFromDB();
+        if ($this->connectionStatus) {
+            $this->DisconnectFromDB();
+        }
         
         $this->mysqli = new mysqli($servername, $username, $password);
         
@@ -73,11 +85,11 @@ class DBSaver extends iSaver {
         
         if ( $this->CreateDatabaseIfNotExists() ) {
             $this->mysqli->select_db("mpk_test");
-            CreateTables();
+            $this->CreateTables();
         } else {
             return false;
         }
-        
+        $this->connectionStatus = true;
         return true;
     }
     
@@ -91,25 +103,31 @@ class DBSaver extends iSaver {
         
     }
     
-    private function CreateTables() {
-        $sql = "DROP TABLE IF EXISTS `sports_kinds`;
-                CREATE TABLE IF NOT EXISTS `sports_kinds` (
+    private function CreateTables() {        
+        $sql = "DROP TABLE IF EXISTS `sports_kinds`;"; 
+        $this->SentQuery($sql);
+        
+        $sql = "CREATE TABLE IF NOT EXISTS `sports_kinds` (
                   `id` int(11) NOT NULL AUTO_INCREMENT,
                   `name` varchar(50) NOT NULL,
                   PRIMARY KEY (`id`)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;";
         $this->SentQuery($sql);
         
-        $sql = "DROP TABLE IF EXISTS `participants`;
-                CREATE TABLE IF NOT EXISTS `participants` (
+        $sql = "DROP TABLE IF EXISTS `participants`;";
+        $this->SentQuery($sql);
+        
+        $sql = "CREATE TABLE IF NOT EXISTS `participants` (
                   `id` int(11) NOT NULL AUTO_INCREMENT,
                   `name` varchar(50) NOT NULL,
                   PRIMARY KEY (`id`)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;";
         $this->SentQuery($sql);
         
-        $sql = "DROP TABLE IF EXISTS `teams`;
-                CREATE TABLE IF NOT EXISTS `teams` (
+        $sql = "DROP TABLE IF EXISTS `teams`;";
+        $this->SentQuery($sql);
+        
+        $sql = "CREATE TABLE IF NOT EXISTS `teams` (
                   `id` int(11) NOT NULL AUTO_INCREMENT,
                   `name` varchar(50) NOT NULL,
                   `sports_kind_id` int(11) NOT NULL,
@@ -119,8 +137,10 @@ class DBSaver extends iSaver {
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;";
         $this->SentQuery($sql);
         
-        $sql = "DROP TABLE IF EXISTS `participants_teams`;
-                CREATE TABLE IF NOT EXISTS `participants_teams` (
+        $sql = "DROP TABLE IF EXISTS `participants_teams`;";
+        $this->SentQuery($sql);
+        
+        $sql = "CREATE TABLE IF NOT EXISTS `participants_teams` (
                   `id` int(11) NOT NULL AUTO_INCREMENT,
                   `participant_id` int(11) NOT NULL,
                   `team_id` int(11) NOT NULL,
@@ -130,11 +150,20 @@ class DBSaver extends iSaver {
                   CONSTRAINT `pt2p` FOREIGN KEY (`participant_id`) REFERENCES `participants` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
                   CONSTRAINT `pt2t` FOREIGN KEY (`participant_id`) REFERENCES `participants` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;";
-        $this->SentQuery($sql);
+        $this->SentMultyQuery($sql);
     }
     
     private function SentQuery($sql) {
         if ($this->mysqli->query($sql) === FALSE) {
+            $this->lastError = $this->mysqli->error;
+            return FALSE;
+        } else {
+            return true;
+        }
+    }
+    
+    private function SentMultyQuery($sql) {
+        if ($this->mysqli->multi_query($sql) === FALSE) {
             $this->lastError = $this->mysqli->error;
             return FALSE;
         } else {

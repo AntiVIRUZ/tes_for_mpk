@@ -39,7 +39,7 @@ class Competition {
                 break;
         }
         try {
-            $this->participants = $this->activeParser->parseFromUrl($url);
+            $this->participants = $this->activeParser->ParseFromUrl($url);
             return true;
         } catch (Exception $exc) {
             echo $exc->getTraceAsString();

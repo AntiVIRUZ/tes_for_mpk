@@ -1,6 +1,6 @@
 <?php
 
-class ClParser {
+class ClHandler {
 
     public $inputType;
     public $destination;
@@ -10,8 +10,7 @@ class ClParser {
     private $inputTypes = array("xml" => 1, "json" => 1);
     private $destinations = array("db" => 1, "csv" => 1, "dbcsv" => 1);
     
-    function __construct($argv) {
-        return $this->setNewArguments($argv);
+    function __construct() {
     }
     
     public function setNewArguments($argv) {
@@ -77,4 +76,3 @@ class ClParser {
     }
 
 }
- $test = new ClParser($argv);

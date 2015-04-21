@@ -13,7 +13,7 @@ abstract class ParserAbstract {
         return $this->lastError;
     }
 
-    private function VerifyArray($array) {
+    protected function VerifyArray($array) {
         $unique_sports_id = array();
         $unique_teams_id = array();
         $unique_participant_id = array();

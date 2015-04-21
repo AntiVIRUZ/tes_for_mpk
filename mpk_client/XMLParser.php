@@ -1,11 +1,11 @@
 <?php
 
-include 'ParserAbstract.php';
-include 'FilesLoader.php';
+include_once 'ParserAbstract.php';
+include_once 'FilesLoader.php';
 
 class XMLParser extends ParserAbstract {
 
-    public function parseFromString($xmlString) {
+    public function ParseFromString($xmlString) {
         try {
             $xml = new SimpleXMLElement($xmlString);
         } catch (Exception $exc) {
@@ -18,13 +18,13 @@ class XMLParser extends ParserAbstract {
         $result["sports_kinds"] = $result["sports_kinds"]["sports_kind"];
         $result["teams"] = $result["teams"]["team"];
         $result["participants"] = $result["participants"]["participant"];
-        foreach ($result["participants"] as $value) {
+        foreach ($result["participants"] as $key => $value) {
             if (count($value["teams"]["team_id"]) == 1)
-                $value["teams"] = array($value["teams"]["team_id"]);
+                $result["participants"][$key]["teams"] = array($value["teams"]["team_id"]);
             else
-                $value["teams"] = $value["teams"]["team_id"];
+                $result["participants"][$key]["teams"] = $value["teams"]["team_id"];
         }
-        if (!VerifyArray($result)) {
+        if (!parent::VerifyArray($result)) {
             trigger_error($this->lastError, E_USER_ERROR);
         }
         return $result;
