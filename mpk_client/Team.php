@@ -53,6 +53,7 @@ class Team {
         foreach ($this->members as $member) {
             array_push($result, $member->name);
         }
+        return $result;
     }
     
     private function SearchMemberBy($string, $field) {

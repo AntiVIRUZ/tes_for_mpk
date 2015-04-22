@@ -6,10 +6,9 @@ class Member {
     public $passport;
     private $group;
      
-    function __construct($name, $passport, $group) {
+    function __construct($name, $passport) {
         $this->name = $name;
         $this->passport = $passport;
-        $this->group = $group;
     }
     
     public function getGroupName() {
