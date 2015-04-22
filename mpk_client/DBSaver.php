@@ -39,48 +39,46 @@ class DBSaver implements iSaver {
     }
 
     public function Save() {
-        $sql = "INSERT INTO sports_kinds (id, name)\n" .
-                "VALUES\n";
-        
-        //Запоминаем количество записей, чтобы после последней поставить ;
-        $recordsCount = count($this->participants["sports_kinds"]);
-        foreach ($this->participants["sports_kinds"] as $key => $value){
-            $sql .= "(".$value["id"].", '".$value["name"]."'),\n";
+        foreach ($this->tables as $table) {
+            $this->SaveTable($table, $this->participants[$table]);
         }
-        $sql[strlen($sql)-2] = ";";
-        $this->SentQuery($sql);
-        
-        $sql = "INSERT INTO teams (id, name, sports_kind_id)\n" .
-                "VALUES\n";
-        
-        $recordsCount = count($this->participants["teams"]);
-        foreach ($this->participants["teams"] as $key => $value){
-            $sql .= "(".$value["id"].", '".$value["name"]."', ".$value["sports_kind_id"]."),\n";
+    }
+    
+    private function SaveTable($name, $values) {
+        $params = array();
+        $sql = "INSERT INTO `" . $name . "` (";
+        foreach ($values[0] as $key => $field) {
+            $sql .= $key. ",";
         }
-        $sql[strlen($sql)-2] = ";";
-        $this->SentQuery($sql);
+        $sql[strlen($sql)-1] = ") ";
+        $sql .= "VALUES";
         
-        $sql = "INSERT INTO participants (id, name)\n" .
-                "VALUES\n";
-        
-        $recordsCount = count($this->participants["participants"]);
-        foreach ($this->participants["participants"] as $key => $value){
-            $sql .= "(".$value["id"].", '".$value["name"]."'),\n";
+        foreach ($values as $field){
+            $sql .= "(";
+            foreach ($field as $value) {
+                $sql .= "?,";
+                array_push($params, $value);
+            }
+            $sql[strlen($sql)-1] = ")";
+            $sql .= ",";
         }
-        $sql[strlen($sql)-2] = ";";
-        $this->SentQuery($sql);
-        
-        $sql = "INSERT INTO participants_teams (id, participant_id, team_id)\n" .
-                "VALUES\n";
-        
-        $i = 1;
-        foreach ($this->participants["participants"] as $key => $value)
-        foreach ($value["teams"] as $team_key => $team_value) {
-            $sql .= "(".$i.", ".$value["id"].", ".$team_value."),\n";
-            $i++;
+        $sql[strlen($sql)-1] = ";";
+        return $this->SentQuery($sql, $params);
+    }
+    
+    private function IncrementIds(&$values, $num) {
+        foreach ($values as $key => $value) {
+            $values[$key]["id"] += $num;
         }
-        $sql[strlen($sql)-2] = ";";
-        return $this->SentQuery($sql);
+        echo "num = ".$num;
+    }
+    
+    private function GetMaxIdFromTable($name) {
+        $result = $this->SentQuery("SELECT MAX(id) FROM ". $name);
+        if ($result) {
+            $info = $this->lastStatement->fetch();
+            return $info["MAX(id)"];
+        }
     }
     
     public function ConnectToDB () {
@@ -193,7 +191,7 @@ class DBSaver implements iSaver {
         if ($input_params) {
             $result = $sth->execute($input_params);
         } else {
-        $result = $sth->execute();
+            $result = $sth->execute();
         }
         if (!$result) {
             print_r($sth->errorInfo());
