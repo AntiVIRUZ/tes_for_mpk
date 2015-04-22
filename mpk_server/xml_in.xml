@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<teams>
+	<team>
+		<name>Первая команда</name>
+		<sports_kind>Волейбол</sports_kind>
+		<members>
+			<member>
+				<name>Ололоев Александр</name>
+				<passport>4715 00 11 22</passport>
+			</member>
+			<member>
+				<name>Пашин Олег</name>
+				<passport>4715 33 44 55</passport>
+			</member>
+		</members>
+	</team>
+	<team>
+		<name>Вторая команда</name>
+		<sports_kind>Волейбол</sports_kind>
+		<members>
+			<member>
+				<name>Пашин Олег</name>
+				<passport>4715 33 44 55</passport>
+			</member>
+			<member>
+				<name>Иванов Иван</name>
+				<passport>4715 66 77 88</passport>
+			</member>
+		</members>
+	</team>
+	<team>
+		<name>Третья команда</name>
+		<sports_kind>Баскетбол</sports_kind>
+		<members>
+			<member>
+				<name>Ололоев Александр</name>
+				<passport>4715 00 11 22</passport>
+			</member>
+			<member>
+				<name>Иванов Иван</name>
+				<passport>4715 66 77 88</passport>
+			</member>
+		</members>
+	</team>
+</teams>
