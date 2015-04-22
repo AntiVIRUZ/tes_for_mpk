@@ -1,16 +1,29 @@
 <?php
 
 include_once 'iSaver.php';
+include_once 'DBSettings.php';
 
 class DBSaver implements iSaver {
 
     private $participants;
     private $lastError;
-    private $mysqli;
+    private $pdo;
     private $connectionStatus;
+    private $dbSettings;
+    private $lastStatement;
+    
+    private $primaryKeyStartValue = array();
+    
+    private $tables = array( "sports_kinds", "participants", "teams", "participants_teams");
     
     function __construct() {
         $this->connectionStatus = false;
+        try {
+            $this->dbSettings = new DBSettings();
+        } catch (Exception $e) {
+            //@TODO Добавить логирование
+            die($e->getMessage());
+        }
     }
     
     public function GetConnectionStatus() {
@@ -26,65 +39,76 @@ class DBSaver implements iSaver {
     }
 
     public function Save() {
-        $sql = "INSERT INTO sports_kinds (id, name)\n" .
-                "VALUES\n";
-        
-        //Запоминаем количество записей, чтобы после последней поставить ;
-        $recordsCount = count($this->participants["sports_kinds"]);
-        foreach ($this->participants["sports_kinds"] as $key => $value){
-            $sql .= "(".$value["id"].", '".$value["name"]."'),\n";
+        foreach ($this->tables as $table) {
+            $this->SaveTable($table, $this->participants[$table]);
         }
-        $sql[strlen($sql)-2] = ";";
-        $this->SentQuery($sql);
-        
-        $sql = "INSERT INTO teams (id, name, sports_kind_id)\n" .
-                "VALUES\n";
-        
-        $recordsCount = count($this->participants["teams"]);
-        foreach ($this->participants["teams"] as $key => $value){
-            $sql .= "(".$value["id"].", '".$value["name"]."', ".$value["sports_kind_id"]."),\n";
-        }
-        $sql[strlen($sql)-2] = ";";
-        $this->SentQuery($sql);
-        
-        $sql = "INSERT INTO participants (id, name)\n" .
-                "VALUES\n";
-        
-        $recordsCount = count($this->participants["participants"]);
-        foreach ($this->participants["participants"] as $key => $value){
-            $sql .= "(".$value["id"].", '".$value["name"]."'),\n";
-        }
-        $sql[strlen($sql)-2] = ";";
-        $this->SentQuery($sql);
-        
-        $sql = "INSERT INTO participants_teams (id, participant_id, team_id)\n" .
-                "VALUES\n";
-        
-        $i = 1;
-        foreach ($this->participants["participants"] as $key => $value)
-        foreach ($value["teams"] as $team_key => $team_value) {
-            $sql .= "(".$i.", ".$value["id"].", ".$team_value."),\n";
-            $i++;
-        }
-        $sql[strlen($sql)-2] = ";";
-        return $this->SentQuery($sql);
     }
     
-    public function ConnectToDB ($servername, $username, $password) {
+    private function SaveTable($name, $values) {
+        $params = array();
+        $sql = "INSERT INTO `" . $name . "` (";
+        foreach ($values[0] as $key => $field) {
+            $sql .= $key. ",";
+        }
+        $sql[strlen($sql)-1] = ") ";
+        $sql .= "VALUES";
+        
+        foreach ($values as $field){
+            $sql .= "(";
+            foreach ($field as $value) {
+                $sql .= "?,";
+                array_push($params, $value);
+            }
+            $sql[strlen($sql)-1] = ")";
+            $sql .= ",";
+        }
+        $sql[strlen($sql)-1] = ";";
+        return $this->SentQuery($sql, $params);
+    }
+    
+    private function IncrementIds(&$values, $num) {
+        foreach ($values as $key => $value) {
+            $values[$key]["id"] += $num;
+        }
+        echo "num = ".$num;
+    }
+    
+    private function GetMaxIdFromTable($name) {
+        $result = $this->SentQuery("SELECT MAX(id) FROM ". $name);
+        if ($result) {
+            $info = $this->lastStatement->fetch();
+            return $info["MAX(id)"];
+        }
+    }
+    
+    public function ConnectToDB () {
+        return $this->ConnectToSpecificBD($this->dbSettings->getDbType(), $this->dbSettings->getServername(), $this->dbSettings->getUsername(), $this->dbSettings->getPassword(), $this->dbSettings->getDatabase());
+    }
+    
+    public function ConnectToSpecificBD($dbType, $servername, $username, $password, $database)
+    {
+        if (!$this->checkSupportingDBDriver($this->dbSettings->getDbType())) {
+            trigger_error("Драйвер базы данных не поддерживается или указан неверно", E_USER_ERROR);
+        }
+        
         if ($this->connectionStatus) {
             $this->DisconnectFromDB();
         }
         
-        $this->mysqli = new mysqli($servername, $username, $password);
+        $connectionString = $this->dbSettings->getDbType() . ":";
+        $connectionString .= "host=" . $servername;
         
-        //Проверяем соединение
-        if ($this->mysqli->connect_error) {
-            $this->lastError = "Connection failed: " . $this->mysqli->connect_error;
-            return false;
+        try {
+            $this->pdo = new PDO($connectionString, $username, $password);
+        } catch (Exception $e) {
+            //@TODO Добавить логирование
+            $this->lastError = $e->getMessage();
+            return FAlSE;
         }
         
-        if ( $this->CreateDatabaseIfNotExists() ) {
-            $this->mysqli->select_db("mpk_test");
+        if ( $this->CreateDatabaseIfNotExists($database) ) {
+            $this->SelectDatabase($database);
+            $this->DeleteTables();
             $this->CreateTables();
         } else {
             return false;
@@ -93,19 +117,28 @@ class DBSaver implements iSaver {
         return true;
     }
     
+    public function SelectDatabase($name) {
+        return $this->SentQuery("use `".$name."`;");
+    }
+    
+    private function checkSupportingDBDriver($driverName) {
+        $avaiableDrivers = PDO::getAvailableDrivers();
+        if (in_array($driverName, $avaiableDrivers)) {
+            return TRUE;
+        } else {
+            return FALSE;
+        }
+    }
+    
     private function DisconnectFromDB () {
-        $this->mysqli->close();
+        $this->pdo = NULL;
     }
     
-    private function CreateDatabaseIfNotExists() {
-        $sql = "CREATE DATABASE IF NOT EXISTS mpk_test CHARACTER SET utf8 COLLATE utf8_general_ci;";
-        return $this->SentQuery($sql);
-        
+    private function CreateDatabaseIfNotExists($database) {
+        return $this->SentQuery("CREATE DATABASE IF NOT EXISTS `".$database."` CHARACTER SET utf8 COLLATE utf8_general_ci;");
     }
     
-    private function CreateTables() {        
-        $sql = "DROP TABLE IF EXISTS `sports_kinds`;"; 
-        $this->SentQuery($sql);
+    private function CreateTables() {
         
         $sql = "CREATE TABLE IF NOT EXISTS `sports_kinds` (
                   `id` int(11) NOT NULL AUTO_INCREMENT,
@@ -114,17 +147,11 @@ class DBSaver implements iSaver {
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;";
         $this->SentQuery($sql);
         
-        $sql = "DROP TABLE IF EXISTS `participants`;";
-        $this->SentQuery($sql);
-        
         $sql = "CREATE TABLE IF NOT EXISTS `participants` (
                   `id` int(11) NOT NULL AUTO_INCREMENT,
                   `name` varchar(50) NOT NULL,
                   PRIMARY KEY (`id`)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;";
-        $this->SentQuery($sql);
-        
-        $sql = "DROP TABLE IF EXISTS `teams`;";
         $this->SentQuery($sql);
         
         $sql = "CREATE TABLE IF NOT EXISTS `teams` (
@@ -137,9 +164,6 @@ class DBSaver implements iSaver {
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;";
         $this->SentQuery($sql);
         
-        $sql = "DROP TABLE IF EXISTS `participants_teams`;";
-        $this->SentQuery($sql);
-        
         $sql = "CREATE TABLE IF NOT EXISTS `participants_teams` (
                   `id` int(11) NOT NULL AUTO_INCREMENT,
                   `participant_id` int(11) NOT NULL,
@@ -150,25 +174,32 @@ class DBSaver implements iSaver {
                   CONSTRAINT `pt2p` FOREIGN KEY (`participant_id`) REFERENCES `participants` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
                   CONSTRAINT `pt2t` FOREIGN KEY (`participant_id`) REFERENCES `participants` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;";
-        $this->SentMultyQuery($sql);
+        $this->SentQuery($sql);
     }
     
-    private function SentQuery($sql) {
-        if ($this->mysqli->query($sql) === FALSE) {
-            $this->lastError = $this->mysqli->error;
-            return FALSE;
-        } else {
-            return true;
+    private function DeleteTables() {
+        foreach (array_reverse($this->tables) as $table) {
+            $sql = "DROP TABLE IF EXISTS `".$table."`;";
+            if (!$this->SentQuery($sql)) {
+                trigger_error("Ошибка сохранения базы данных", E_USER_ERROR);
+            }
         }
     }
     
-    private function SentMultyQuery($sql) {
-        if ($this->mysqli->multi_query($sql) === FALSE) {
-            $this->lastError = $this->mysqli->error;
-            return FALSE;
+    private function SentQuery($sql, $input_params = NULL) {
+        $sth = $this->pdo->prepare($sql);
+        if ($input_params) {
+            $result = $sth->execute($input_params);
         } else {
-            return true;
+            $result = $sth->execute();
         }
+        if (!$result) {
+            print_r($sth->errorInfo());
+            $this->lastError = $sth->errorInfo();
+        } else {
+            $this->lastStatement = $sth;
+        }
+        return $result;
     }
     
     function __destruct() {

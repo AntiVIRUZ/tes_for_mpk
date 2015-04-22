@@ -11,7 +11,7 @@ if (!$clParser->setNewArguments($argv)) {
 $competition = new Competition();
 $competition->GetParticipantsFromURL($clParser->inputType, $clParser->url);
 if ($clParser->destination == "db" || $clParser->destination == "dbcsv") {
-    $competition->CreateConnectionToDB("localhost", "root", "toor");
+    $competition->CreateConnectionToDB();
     $competition->SaveParticipants("db");
 } else {
     $competition->SaveParticipants($clParser->destination);
