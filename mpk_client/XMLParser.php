@@ -13,20 +13,19 @@ class XMLParser extends ParserAbstract {
             return FALSE;
         }
         $json = json_encode($xml);
-        $result = json_decode($json, true);
-
-        $result["sports_kinds"] = $result["sports_kinds"]["sports_kind"];
-        $result["teams"] = $result["teams"]["team"];
-        $result["participants"] = $result["participants"]["participant"];
-        foreach ($result["participants"] as $key => $value) {
-            if (count($value["teams"]["team_id"]) == 1)
-                $result["participants"][$key]["teams"] = array($value["teams"]["team_id"]);
-            else
-                $result["participants"][$key]["teams"] = $value["teams"]["team_id"];
+        $array = json_decode($json, true);
+        $array = $this->MakeResultLikeJSON($array);
+        $result = parent::GetTeamsFromArray($array);
+       
+        return $result;
+    }
+    
+    private function MakeResultLikeJSON($result) {
+        foreach ($result["team"] as $key => $team) {
+            $result["team"][$key]["members"] = $team["members"]["member"];
         }
-        if (!parent::VerifyArray($result)) {
-            trigger_error($this->lastError, E_USER_ERROR);
-        }
+        $result["teams"] = $result["team"];
+        unset($result["team"]);
         return $result;
     }
 

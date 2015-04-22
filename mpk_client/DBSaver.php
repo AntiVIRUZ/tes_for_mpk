@@ -33,7 +33,7 @@ class DBSaver implements iSaver {
     }
 
     public function SetParticipants($participants) {
-        
+        $this->participants = $this->ParseFromTeams($participants);
     }
 
     public function Save() {
@@ -89,39 +89,37 @@ class DBSaver implements iSaver {
         $sportsKindsId;
         $memberList;
 
-        $this->participants = array();
-        foreach ($tables as $value) {
-            $this->participants[$value] = array();
+        $result = array();
+        foreach ($this->tables as $value) {
+            $result[$value] = array();
         }
 
         foreach ($array as $value) {
-            $sportsKindsId = $this->SearchByName($this->participants["sports_kinds"], $value->sportsKind);
+            $sportsKindsId = $this->SearchByName($result["sports_kinds"], $value->sportsKind);
             if ($sportsKindsId === FALSE) {
                 $sportsKindsNumber++;
                 $sportsKindsId = $sportsKindsNumber;
-                $this->participants["sports_kinds"][$sportsKindsNumber] = array("id" => $sportsKindsNumber, "name" => $value->sportsKind);
+                $result["sports_kinds"][$sportsKindsNumber] = array("id" => $sportsKindsNumber, "name" => $value->sportsKind);
             }
 
             $teamsNumber++;
-            $this->participants["teams"][$teamsNumber] = array("id" => $teamsNumber, "name" => $value->name, "sports_kind_id" => $sportsKindsId, "motto" => $value->motto);
+            $result["teams"][$teamsNumber] = array("id" => $teamsNumber, "name" => $value->name, "sports_kind_id" => $sportsKindsId, "motto" => $value->motto);
 
             $memberList = $value->GetMembersList();
-            print_r($memberList);
             foreach ($memberList as $memberName) {
-                $memberId = $this->SearchByName($this->participants["members"], $memberName);
+                $memberId = $this->SearchByName($result["members"], $memberName);
                 if ($memberId === FALSE) {
                     $member = $value->GetMemberBy($memberName, "name");
                     $membersNumber++;
                     $memberId = $membersNumber;
-                    echo "member = \n";
-                    print_r($member);
-                    $this->participants["members"][$membersNumber] = array("id" => $membersNumber, "name" => $member->name, "passport" => $member->passport);
+                    $result["members"][$membersNumber] = array("id" => $membersNumber, "name" => $member->name, "passport" => $member->passport);
                 }
 
                 $membersToTeamsNumber++;
-                $this->participants["members_teams"][$membersToTeamsNumber] = array("id" => $membersToTeamsNumber, "member_id" => $memberId, "team_id" => $teamsNumber);
+                $result["members_teams"][$membersToTeamsNumber] = array("id" => $membersToTeamsNumber, "member_id" => $memberId, "team_id" => $teamsNumber);
             }
         }
+        return $result;
     }
 
     private function SearchByName($array, $name) {
@@ -135,7 +133,7 @@ class DBSaver implements iSaver {
     private function SaveTable($name, $values) {
         $params = array();
         $sql = "INSERT INTO `" . $name . "` (";
-        foreach ($values[0] as $key => $field) {
+        foreach ($values[1] as $key => $field) {
             $sql .= $key . ",";
         }
         $sql[strlen($sql) - 1] = ") ";
@@ -189,38 +187,40 @@ class DBSaver implements iSaver {
     private function CreateTables() {
 
         $sql = "CREATE TABLE IF NOT EXISTS `sports_kinds` (
-                  `id` int(11) NOT NULL AUTO_INCREMENT,
-                  `name` varchar(50) NOT NULL,
-                  PRIMARY KEY (`id`)
+                    `id` int(11) NOT NULL AUTO_INCREMENT,
+                    `name` varchar(50) NOT NULL,
+                    PRIMARY KEY (`id`)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;";
         $this->SentQuery($sql);
 
-        $sql = "CREATE TABLE IF NOT EXISTS `participants` (
-                  `id` int(11) NOT NULL AUTO_INCREMENT,
-                  `name` varchar(50) NOT NULL,
-                  PRIMARY KEY (`id`)
+        $sql = "CREATE TABLE IF NOT EXISTS `members` (
+                    `id` int(11) NOT NULL AUTO_INCREMENT,
+                    `name` varchar(50) NOT NULL,
+                    `passport` varchar(50) NOT NULL,
+                    PRIMARY KEY (`id`)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;";
         $this->SentQuery($sql);
 
         $sql = "CREATE TABLE IF NOT EXISTS `teams` (
-                  `id` int(11) NOT NULL AUTO_INCREMENT,
-                  `name` varchar(50) NOT NULL,
-                  `sports_kind_id` int(11) NOT NULL,
-                  PRIMARY KEY (`id`),
-                  KEY `t2sk` (`sports_kind_id`),
-                  CONSTRAINT `t2sk` FOREIGN KEY (`sports_kind_id`) REFERENCES `sports_kinds` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
+                    `id` int(11) NOT NULL AUTO_INCREMENT,
+                    `name` varchar(50) NOT NULL,
+                    `sports_kind_id` int(11) NOT NULL,
+                    `motto` varchar(200),
+                    PRIMARY KEY (`id`),
+                    KEY `t2sk` (`sports_kind_id`),
+                    CONSTRAINT `t2sk` FOREIGN KEY (`sports_kind_id`) REFERENCES `sports_kinds` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;";
         $this->SentQuery($sql);
 
-        $sql = "CREATE TABLE IF NOT EXISTS `participants_teams` (
-                  `id` int(11) NOT NULL AUTO_INCREMENT,
-                  `participant_id` int(11) NOT NULL,
-                  `team_id` int(11) NOT NULL,
-                  PRIMARY KEY (`id`),
-                  UNIQUE KEY `participant_id_team_id` (`participant_id`,`team_id`),
-                  KEY `pt2t` (`team_id`),
-                  CONSTRAINT `pt2p` FOREIGN KEY (`participant_id`) REFERENCES `participants` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
-                  CONSTRAINT `pt2t` FOREIGN KEY (`participant_id`) REFERENCES `participants` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
+        $sql = "CREATE TABLE IF NOT EXISTS `members_teams` (
+                    `id` int(11) NOT NULL AUTO_INCREMENT,
+                    `member_id` int(11) NOT NULL,
+                    `team_id` int(11) NOT NULL,
+                    PRIMARY KEY (`id`),
+                    UNIQUE KEY `member_id_team_id` (`member_id`,`team_id`),
+                    KEY `mt2t` (`team_id`),
+                    CONSTRAINT `mt2t` FOREIGN KEY (`team_id`) REFERENCES `teams` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
+                    CONSTRAINT `mt2m` FOREIGN KEY (`member_id`) REFERENCES `members` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;";
         $this->SentQuery($sql);
     }

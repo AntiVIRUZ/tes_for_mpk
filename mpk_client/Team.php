@@ -8,7 +8,7 @@ class Team {
     public $sportsKind;
     public $motto;
     
-    private $fielList = array("name", "passport");
+    private $memberFielList = array("name", "passport");
     
     private $members;
 
@@ -57,7 +57,7 @@ class Team {
     }
     
     private function SearchMemberBy($string, $field) {
-        if (in_array($field, $this->fielList)) {
+        if (in_array($field, $this->memberFielList)) {
             foreach($this->members as $key => $member) {
                 if ($member->$field == $string) {
                     return $key;
