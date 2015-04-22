@@ -13,13 +13,10 @@ class XMLParser extends ParserAbstract {
             return FALSE;
         }
         $json = json_encode($xml);
-        $result = json_decode($json, true);
-        $result = $this->MakeResultLikeJSON($result);
-        print_r($result);
-        if (!parent::VerifyArray($result)) {
-            trigger_error($this->lastError, E_USER_ERROR);
-        }
-        
+        $array = json_decode($json, true);
+        $array = $this->MakeResultLikeJSON($array);
+        $result = parent::GetTeamsFromArray($array);
+       
         return $result;
     }
     

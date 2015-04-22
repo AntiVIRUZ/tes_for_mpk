@@ -1,8 +1,13 @@
 <?php
 
+include_once 'Team.php';
+include_once 'Member.php';
+
 abstract class ParserAbstract {
 
     private $lastError;
+    private $memberList;
+    private $memberCount;
 
     public function parseFromUrl($url) {
         $xmlString = FilesLoader::LoadFile($url);
@@ -13,93 +18,65 @@ abstract class ParserAbstract {
         return $this->lastError;
     }
 
-    protected function VerifyArray($array) {
-        $unique_sports_id = array();
-        $unique_teams_id = array();
-        $unique_participant_id = array();
-        $unique_participant_to_team_id = array();
-
-        //Проверяем уникальность ID и наличие данных в каждом поле
-        foreach ($array["sports_kinds"] as $value) {
-            if (!isset($value["id"])) {
-                $this->lastError = "Есть вид спорта без id";
-                return FALSE;
-            }
-            if (isset($unique_sports_id[$value["id"]])) {
-                $this->lastError = "Среди видов спорта есть неуникальный id (" . $value["id"] . ")";
-                return FALSE;
+    protected function GetTeamsFromArray($array) {
+        $teamsCount = 0;
+        $result = array();
+        
+        $this->memberList = array();
+        $this->memberCount = 0;
+        
+        foreach ($array["teams"] as $team) {
+            $this->VerifyTeam($team);
+            $members =& $this->FormMembersArray($team["members"]);
+            $result[$teamsCount] = new Team($team["name"], $team["sports_kind"], $members, $team["motto"]);
+            $teamsCount++;
+        }
+        return $result;
+    }
+    
+    private function &FormMembersArray($members) {
+        $result = array();
+        $teamMemberCount = 0;
+        foreach ($members as $member) {
+            $this->VerifyMember($member);
+            $memberNumber = $this->SearchByName($this->memberList, $member["name"]);
+            if ($memberNumber === FALSE) {
+                $this->memberList[$this->memberCount] = new Member($member["name"], $member["passport"]);
+                $result[$teamMemberCount] =& $this->memberList[$this->memberCount];
+                $this->memberCount++;
+                $teamMemberCount++;
             } else {
-                $unique_sports_id[$value["id"]] = 1;
-            }
-            if (!$value["name"]) {
-                $this->lastError = "У вида спорта с id " . $value["id"] . " нет имени";
-                return FALSE;
+                $result[$teamMemberCount] =& $this->memberList[$memberNumber];
+                $teamMemberCount++;
             }
         }
-
-        foreach ($array["teams"] as $value) {
-            if (!isset($value["id"])) {
-                $this->lastError = "Есть команда без id";
-                return FALSE;
-            }
-            if (isset($unique_teams_id[$value["id"]])) {
-                $this->lastError = "Среди команд есть неуникальный id (" . $value["id"] . ")";
-                return FALSE;
-            } else {
-                $unique_teams_id[$value["id"]] = 1;
-            }
-            if (!$value["name"]) {
-                $this->lastError = "У команды с id " . $value["id"] . " нет имени";
-                return FALSE;
-            }
-            if (!$value["sports_kind_id"]) {
-                $this->lastError = "Для команды с id " . $value["id"] . " не закреплен вид спорта";
-                return FALSE;
-            }
-            if (!isset($unique_sports_id[$value["sports_kind_id"]])) {
-                $this->lastError = "Для команды с id " . $value["id"] . " не существует вида спорта с id = " . $value["sports_kind_id"];
-                return FALSE;
-            }
+        return $result;
+    }
+    
+    private function VerifyTeam($team) {
+        if ($team["name"] == "") {
+            trigger_error("У группы нет имени", E_USER_ERROR);
         }
-
-        foreach ($array["participants"] as $key => $value) {
-            $unique_participant_to_team_id[$key] = array();
-            if (!isset($value["id"])) {
-                $this->lastError = "Есть учасник без id";
-                return FALSE;
-            }
-            if (isset($unique_participant_id[$value["id"]])) {
-                $this->lastError = "Среди команд есть неуникальный id (" . $value["id"] . ")";
-                return FALSE;
-            } else {
-                $unique_participant_id[$value["id"]] = 1;
-            }
-            if (!$value["name"]) {
-                $this->lastError = "У участника с id " . $value["id"] . " нет имени";
-                return FALSE;
-            }
-            if (count($value["teams"]) == 0) {
-                $this->lastError = "Участник с id " . $value["id"] . " не закреплен ни за одной командой";
-                return FALSE;
-            }
-            foreach ($value["teams"] as $team_id) {
-                if ($team_id == "") {
-                    $this->lastError = "Среди команд участника с id " . $value["id"] . "есть пустые записи";
-                    return FALSE;
-                }
-                if (!isset($unique_teams_id[$team_id])) {
-                    $this->lastError = "Участник с id " . $value["id"] . " закреплен за несуществующей командой с id " . $team_id;
-                    return FALSE;
-                }
-                if (isset($unique_participant_to_team_id[$key][$team_id])) {
-                    $this->lastError = "Участник с id " . $value["id"] . " дважды прикреплен к команде с id " . $team_id;
-                    return FALSE;
-                } else {
-                    $unique_participant_to_team_id[$key][$team_id] = 1;
-                }
-            }
+        if ($team["sports_kind"] == "") {
+            trigger_error("У группы нет вида спорта", E_USER_ERROR);
         }
-        return TRUE;
+    }
+    
+    private function VerifyMember($member) {
+        if ($member["name"] == "") {
+            trigger_error("У участника нет имени", E_USER_ERROR);
+        }
+        if ($member["passport"] == "") {
+            trigger_error("У участника ". $member["name"] . " не заданы паспортные данные", E_USER_ERROR);
+        }
+    }
+
+    private function SearchByName($array, $name) {
+        foreach ($array as $key => $value) {
+            if ($value->name == $name)
+                return $key;
+        }
+        return FALSE;
     }
 
     abstract public function parseFromString($xmlString);
