@@ -79,7 +79,8 @@ class Competition {
         try {
             $this->activeSaver->SetParticipants($this->participants);
             if (!$this->activeSaver->Save()) {
-                echo "Ошибка сохранения: ". $this->activeSaver->GetLastError();
+                echo "Ошибка сохранения: ";
+                print_r($this->activeSaver->GetLastError());
             }
             return true;
         } catch (Exception $exc) {

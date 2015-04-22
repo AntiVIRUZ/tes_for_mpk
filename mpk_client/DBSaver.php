@@ -10,6 +10,7 @@ class DBSaver implements iSaver {
     private $pdo;
     private $connectionStatus;
     private $dbSettings;
+    private $lastStatement;
     
     private $primaryKeyStartValue = array();
     
@@ -83,12 +84,12 @@ class DBSaver implements iSaver {
     }
     
     public function ConnectToDB () {
-        return $this->ConnectToSpecificBD($this->dbSettings->getDbType(), $this->dbSettings->getServername(), $this->dbSettings->getUsername(), $this->dbSettings->getPassword(), $this->dbSettings->getDatabase);
+        return $this->ConnectToSpecificBD($this->dbSettings->getDbType(), $this->dbSettings->getServername(), $this->dbSettings->getUsername(), $this->dbSettings->getPassword(), $this->dbSettings->getDatabase());
     }
     
     public function ConnectToSpecificBD($dbType, $servername, $username, $password, $database)
     {
-        if (!checkSupportingDBDriver($this->dbSettings->getDbType())) {
+        if (!$this->checkSupportingDBDriver($this->dbSettings->getDbType())) {
             trigger_error("Драйвер базы данных не поддерживается или указан неверно", E_USER_ERROR);
         }
         
@@ -109,6 +110,7 @@ class DBSaver implements iSaver {
         
         if ( $this->CreateDatabaseIfNotExists($database) ) {
             $this->SelectDatabase($database);
+            $this->DeleteTables();
             $this->CreateTables();
         } else {
             return false;
@@ -118,7 +120,7 @@ class DBSaver implements iSaver {
     }
     
     public function SelectDatabase($name) {
-        return $this->SentQuery("use " . $name . ";");
+        return $this->SentQuery("use `".$name."`;");
     }
     
     private function checkSupportingDBDriver($driverName) {
@@ -135,7 +137,7 @@ class DBSaver implements iSaver {
     }
     
     private function CreateDatabaseIfNotExists($database) {
-        return SentQuery("CREATE DATABASE IF NOT EXISTS `". $database . "` CHARACTER SET utf8 COLLATE utf8_general_ci;");
+        return $this->SentQuery("CREATE DATABASE IF NOT EXISTS `".$database."` CHARACTER SET utf8 COLLATE utf8_general_ci;");
     }
     
     private function CreateTables() {
@@ -174,14 +176,30 @@ class DBSaver implements iSaver {
                   CONSTRAINT `pt2p` FOREIGN KEY (`participant_id`) REFERENCES `participants` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
                   CONSTRAINT `pt2t` FOREIGN KEY (`participant_id`) REFERENCES `participants` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;";
-        $this->SentMultyQuery($sql);
+        $this->SentQuery($sql);
     }
     
-    private function SentQuery($sql) {
+    private function DeleteTables() {
+        foreach (array_reverse($this->tables) as $table) {
+            $sql = "DROP TABLE IF EXISTS `".$table."`;";
+            if (!$this->SentQuery($sql)) {
+                trigger_error("Ошибка сохранения базы данных", E_USER_ERROR);
+            }
+        }
+    }
+    
+    private function SentQuery($sql, $input_params = NULL) {
         $sth = $this->pdo->prepare($sql);
+        if ($input_params) {
+            $result = $sth->execute($input_params);
+        } else {
         $result = $sth->execute();
+        }
         if (!$result) {
-            $this->lastError = $this->pdo->errorInfo();
+            print_r($sth->errorInfo());
+            $this->lastError = $sth->errorInfo();
+        } else {
+            $this->lastStatement = $sth;
         }
         return $result;
     }

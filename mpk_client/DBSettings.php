@@ -15,7 +15,7 @@ class DBSettings {
 
     public function LoadSettings() {
         $settings = parse_ini_file($this->configFile);
-        CheckIniFile($settings);
+        $this->CheckIniFile($settings);
         $this->dbType = $settings["dbType"];
         $this->servername = $settings["servername"];
         $this->username = $settings["username"];
@@ -58,4 +58,7 @@ class DBSettings {
         return $this->servername;
     }
 
+    public function getDatabase() {
+        return $this->database;
+    }
 }
