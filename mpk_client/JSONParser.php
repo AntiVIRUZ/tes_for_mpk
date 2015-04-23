@@ -21,7 +21,8 @@ class JSONParser extends ParserAbstract {
     public function ParseFromString($jsonString) {
         $array = json_decode($jsonString, true);
         if ($array === null) {
-            trigger_error("Ошибка, неверно сформирован полученный файл\nJSON имеет синтаксические ошибки", E_USER_ERROR);
+            $this->lastError = "Ошибка, неверно сформирован полученный файл. JSON имеет синтаксические ошибки (JSONParser::ParseFromString)";
+            return FALSE;
         }
         
         $result = parent::GetTeamsFromArray($array);

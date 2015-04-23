@@ -105,17 +105,18 @@ class Competition {
                 $this->activeParser =& $this->JSONParser;
                 break;
             default :
-                $this->log->LogError("Ошибка: неверный формат входного файла");
+                $this->log->LogError("Ошибка: неверный формат входного файла (Competition::GetParticipantsFromURL)");
                 return FALSE;
                 break;
         }
-        try {
-            $this->participants = $this->activeParser->ParseFromUrl($url);
-            return true;
-        } catch (Exception $exc) {
-            $this->log->LogError($exc->getTraceAsString());
+        $result = $this->activeParser->ParseFromUrl($url);
+        if ($result !== false) {
+            $this->participants = $result;
+        } else {
+            $this->log->LogError($this->activeParser->GetLastError());
             return false;
         }
+        return true;
     }
     
     /**
@@ -177,8 +178,8 @@ class Competition {
         $this->activeSaver->SetParticipants($this->participants);
         if (!$this->activeSaver->Save()) {
             $this->log->LogError("Ошибка сохранения: SQL". $this->DBSaver->GetLastSqlError());
-        $this->log->LogError("Объяснение: ".$this->DBSaver->GetLastError());
-        return false;
+            $this->log->LogError("Объяснение: ".$this->DBSaver->GetLastError());
+            return false;
         }
         return true;
     }

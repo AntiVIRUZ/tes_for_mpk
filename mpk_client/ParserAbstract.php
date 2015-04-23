@@ -26,6 +26,12 @@ abstract class ParserAbstract {
      * @var int
      */
     private $memberCount;
+    /**
+     * Хранит описание последней возникшей ошибки
+     * @access private
+     * @var string
+     */
+    private $lastError;
 
     /**
      * Загружает файл с $url и инициализирует парсинг
@@ -43,7 +49,7 @@ abstract class ParserAbstract {
      * полученного из XML или JSON
      * @access protected
      * @param array $array Ассоциативный массив с данными
-     * @return array Массив экземпляров класса Team
+     * @return mixed array Массив экземпляров класса Team, FALSE в случае некорректных входных данных
      */
     protected function GetTeamsFromArray($array) {
         $teamsCount = 0;
@@ -53,7 +59,9 @@ abstract class ParserAbstract {
         $this->memberCount = 0;
         
         foreach ($array["teams"] as $team) {
-            $this->VerifyTeam($team);
+            if (!$this->VerifyTeam($team)) {
+                return FALSE;
+            }
             $members =& $this->FormMembersArray($team["members"]);
             $result[$teamsCount] = new Team($team["name"], $team["sports_kind"], $members, $team["motto"]);
             $teamsCount++;
@@ -67,13 +75,15 @@ abstract class ParserAbstract {
      * Если человек с таким именем уже существует, то функция помещает в массив ссылку на него
      * @access private
      * @param array $members Ассоциативный массив с информацией о участниках конкретной группы
-     * @return &array Массив ссылок на экземпляры класса Member
+     * @return mixed  &array Массив ссылок на экземпляры класса Member, FALSE в случае некорректных входных данных
      */
     private function &FormMembersArray($members) {
         $result = array();
         $teamMemberCount = 0;
         foreach ($members as $member) {
-            $this->VerifyMember($member);
+            if (!$this->VerifyMember($member)) {
+                return FALSE;
+            }
             $memberNumber = $this->SearchByName($this->memberList, $member["name"]);
             if ($memberNumber === FALSE) {
                 $this->memberList[$this->memberCount] = new Member($member["name"], $member["passport"]);
@@ -91,15 +101,18 @@ abstract class ParserAbstract {
     /**
      * Проверяет полноту данных команды
      * @access private
-     * @param array $team ассоциатиынй массив данных команды
+     * @param boolean TRUE если ошибок нет, FALSE в ином случае
      */
     private function VerifyTeam($team) {
         if ($team["name"] == "") {
-            trigger_error("У группы нет имени", E_USER_ERROR);
+            $this->lastError = "У группы нет имени (ParserAbstract::VerifyTeam)";
+            return FALSE;
         }
         if ($team["sports_kind"] == "") {
-            trigger_error("У группы нет вида спорта", E_USER_ERROR);
+            $this->lastError = "У группы нет вида спорта (ParserAbstract::VerifyTeam)";
+            return FALSE;
         }
+        return true;
     }
     
     /**
@@ -109,11 +122,14 @@ abstract class ParserAbstract {
      */
     private function VerifyMember($member) {
         if ($member["name"] == "") {
-            trigger_error("У участника нет имени", E_USER_ERROR);
+            $this->lastError = "У участника нет имени (ParserAbstract::VerifyMember)";
+            return FALSE;
         }
         if ($member["passport"] == "") {
-            trigger_error("У участника ". $member["name"] . " не заданы паспортные данные", E_USER_ERROR);
+            $this->lastError = "У участника ". $member["name"] . " не заданы паспортные данные (ParserAbstract::VerifyMember)";
+            return FALSE;
         }
+        return TRUE;
     }
 
     /**
@@ -129,6 +145,15 @@ abstract class ParserAbstract {
                 return $key;
         }
         return FALSE;
+    }
+    
+    /**
+     * Возвращает описание последней возникшей ошибки
+     * @access public
+     * @return string
+     */
+    public function GetLastError() {
+        return $this->lastError;
     }
 
     /**
