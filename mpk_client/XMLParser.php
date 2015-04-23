@@ -22,7 +22,7 @@ class XMLParser extends ParserAbstract {
         try {
             $xml = new SimpleXMLElement($xmlString);
         } catch (Exception $exc) {
-            trigger_error("Ошибка, неверно сформирован полученный файл. XML имеет синтаксические ошибки", E_USER_ERROR);
+            $this->lastError = "Ошибка, неверно сформирован полученный файл. XML имеет синтаксические ошибки (XMLParser::ParseFromString)";
             return FALSE;
         }
         $json = json_encode($xml);

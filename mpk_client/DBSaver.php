@@ -29,6 +29,11 @@ class DBSaver implements iSaver {
      * @access private
      * @var array 
      */
+    private $lastSqlError;
+    /**
+     * Человеческое объяснение места возникновения последней ошибки
+     * @var string
+     */
     private $lastError;
     /**
      * Экземпляр соединения с базой данных
@@ -61,17 +66,20 @@ class DBSaver implements iSaver {
      * @var array
      */
     private $tables = array( "sports_kinds", "members", "teams", "members_teams");
-
+    /**
+     *  Экземпляр класса записи логов
+     * @var KLogger
+     */
+    private $log;
+    
     /**
      * Метод-конструктор. Загружает настройки соединения по умолчанию
      */
     function __construct() {
         $this->connectionStatus = false;
-        try {
-            $this->dbSettings = new DBSettings();
-        } catch (Exception $e) {
-            //@TODO Добавить логирование
-            die($e->getMessage());
+        $this->log = new KLogger(Competition::DEFAULT_LOG_FILE_PATH, Competition::DEFAULT_LOG_LEVEL);
+        if (!$this->LoadSettingsFile()) {
+            return false;
         }
     }
 
@@ -92,6 +100,17 @@ class DBSaver implements iSaver {
      * @return array [0] - Код ошибки SQLSTATE (пятисимвольный код состоящий из букв и цифр, определенный в стандарте ANSI SQL).<br>
      * [1] - Код ошибки, возвращаемый драйвером.<br>
      * [2] - Сообщение об ошибке, выданное драйвером.
+     */
+    public function GetLastSqlError() {
+        $this->log->LogDebug($this->lastSqlError);
+        return $this->lastSqlError;
+    }
+    
+    /**
+     * Получить человеческое объяснение последней ошибки
+     * 
+     * @access public
+     * @return string Описание ошибки
      */
     public function GetLastError() {
         return $this->lastError;
@@ -118,6 +137,7 @@ class DBSaver implements iSaver {
                 return FALSE;
             }
         }
+        
         return TRUE;
     }
 
@@ -131,7 +151,7 @@ class DBSaver implements iSaver {
     }
     
     /**
-     * Устанавливает соединение к базе данных с пользовательскими настройками
+     * Устанавливает соединение к СУБД с пользовательскими настройками и подготавливает базу данных для записи в нее.
      * @access public
      * @param string $dbType тип СУБД
      * @param string $servername адресс сервера
@@ -142,31 +162,21 @@ class DBSaver implements iSaver {
      */
     public function ConnectToSpecificBD($dbType, $servername, $username, $password, $database) {
         if (!$this->checkSupportingDBDriver($this->dbSettings->getDbType())) {
-            trigger_error("Драйвер базы данных не поддерживается или указан неверно", E_USER_ERROR);
+            $this->lastError = "Драйвер базы данных не поддерживается или указан неверно";
+            return FALSE;
         }
 
         if ($this->connectionStatus) {
             $this->DisconnectFromDB();
         }
 
-        $connectionString = $this->dbSettings->getDbType() . ":";
-        $connectionString .= "host=" . $servername;
-
-        try {
-            $this->pdo = new PDO($connectionString, $username, $password);
-        } catch (Exception $e) {
-            //@TODO Добавить логирование
-            $this->lastError = $e->getMessage();
-            return FAlSE;
+        if (!$this->CreateConnection($dbType, $servername, $username, $password)) {
+            return FALSE;
         }
-
-        if ($this->CreateDatabaseIfNotExists($database)) {
-            $this->SelectDatabase($database);
-            $this->DeleteTables();
-            $this->CreateTables();
-        } else {
-            return false;
+        if (!$this->PrepareDB($database)) {
+            return FALSE;
         }
+        
         $this->connectionStatus = true;
         return true;
     }
@@ -182,6 +192,74 @@ class DBSaver implements iSaver {
         return $this->SentQuery("use `" . $name . "`;");
     }
 
+    /**
+     * Создает экземпляр класса настроек и загружает настройки
+     * @access private
+     * @return boolean TRUE если настройки успешно загружены, FALSE в ином случае
+     */
+    private function LoadSettingsFile() {
+        $this->dbSettings = new DBSettings();
+        if (!$this->dbSettings->LoadSettings()) {
+            $this->lastError = "Ошибка файла настроек. " . $this->dbSettings->GetLastError() . " Доступно сохранение только по пользовательскому соединению";
+            $this->log->LogError($this->lastError);
+            return false;
+        }
+        return true;
+    }
+    
+    /**
+     * Устанавливает соединение к СУБД
+     * @access private
+     * @param string $dbType тип СУБД
+     * @param string $servername адресс сервера
+     * @param string $username логин
+     * @param string $password пароль
+     * @param string $database название базы данных
+     * @return boolean TRUE если соединение установлено, FALSE в ином случае
+     */
+    private function CreateConnection($dbType, $servername, $username, $password) {
+        $connectionString = $dbType . ":";
+        $connectionString .= "host=" . $servername;
+
+        try {
+            $this->pdo = new PDO($connectionString, $username, $password);
+        } catch (Exception $e) {
+            $this->lastSqlError = $e->getMessage();
+            $this->lastError = "Ошибка инициализации драйвера PDO (DBSaver::CreateConnection)";
+            return FALSE;
+        }
+        
+        return TRUE;
+    }
+    
+    /**
+     * Подготовка базы данных после подключение
+     * 
+     * Производится создание БД и смена активной БД, удаляются старые таблицы и создаются новые
+     * @access private
+     * @param string $database Имя базы данных
+     * @return boolean TRUE если все операции прошли успешно, FALSE в ином случае
+     */
+    private function PrepareDB ($database) {
+        if (!$this->CreateDatabaseIfNotExists($database)) {
+            $this->lastError = "Не удалось создать базу данных (DBSaver::CreateDatabaseIfNotExists)";
+            return FALSE;
+        }
+        if (!$this->SelectDatabase($database)) {
+            $this->lastError = "Ошибка подключения к базе данных (DBSaver::SelectDatabase)";
+            return FALSE;
+        }
+        if (!$this->DeleteTables()) {
+            $this->lastError = "Ошибка удаления таблиц (DBSaver::DeleteTables)";
+            return FALSE;
+        }
+        if (!$this->CreateTables()) {
+            $this->lastError = "Ошибка создания таблиц (DBSaver::CreateTables)";
+            return FALSE;
+        }
+        return TRUE;
+    }
+    
     /**
      * Парсит список участников.
      * 
@@ -290,7 +368,6 @@ class DBSaver implements iSaver {
         foreach ($values as $key => $value) {
             $values[$key]["id"] += $num;
         }
-        echo "num = " . $num;
     }
 
     /**
@@ -352,7 +429,7 @@ class DBSaver implements iSaver {
                     `name` varchar(50) NOT NULL,
                     PRIMARY KEY (`id`)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;";
-        $this->SentQuery($sql);
+        if (!$this->SentQuery($sql)) return FALSE;
 
         $sql = "CREATE TABLE IF NOT EXISTS `members` (
                     `id` int(11) NOT NULL AUTO_INCREMENT,
@@ -360,7 +437,7 @@ class DBSaver implements iSaver {
                     `passport` varchar(50) NOT NULL,
                     PRIMARY KEY (`id`)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;";
-        $this->SentQuery($sql);
+        if (!$this->SentQuery($sql)) return FALSE;
 
         $sql = "CREATE TABLE IF NOT EXISTS `teams` (
                     `id` int(11) NOT NULL AUTO_INCREMENT,
@@ -371,7 +448,7 @@ class DBSaver implements iSaver {
                     KEY `t2sk` (`sports_kind_id`),
                     CONSTRAINT `t2sk` FOREIGN KEY (`sports_kind_id`) REFERENCES `sports_kinds` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;";
-        $this->SentQuery($sql);
+        if (!$this->SentQuery($sql)) return FALSE;
 
         $sql = "CREATE TABLE IF NOT EXISTS `members_teams` (
                     `id` int(11) NOT NULL AUTO_INCREMENT,
@@ -383,7 +460,9 @@ class DBSaver implements iSaver {
                     CONSTRAINT `mt2t` FOREIGN KEY (`team_id`) REFERENCES `teams` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
                     CONSTRAINT `mt2m` FOREIGN KEY (`member_id`) REFERENCES `members` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;";
-        $this->SentQuery($sql);
+        if (!$this->SentQuery($sql)) return FALSE;
+        
+        return true;
     }
 
     /**
@@ -394,9 +473,11 @@ class DBSaver implements iSaver {
         foreach (array_reverse($this->tables) as $table) {
             $sql = "DROP TABLE IF EXISTS `" . $table . "`;";
             if (!$this->SentQuery($sql)) {
-                trigger_error("Ошибка сохранения базы данных", E_USER_ERROR);
+                $this->lastError = "Ошибка удаления таблицы";
+                return FALSE;
             }
         }
+        return TRUE;
     }
 
     /**
@@ -417,8 +498,9 @@ class DBSaver implements iSaver {
             $result = $sth->execute();
         }
         if (!$result) {
-            print_r($sth->errorInfo());
-            $this->lastError = $sth->errorInfo();
+            $this->lastSqlError = $sth->errorInfo();
+            $this->lastError = "Ошибка запроса к БД (DBSaver::SentQuery)";
+            $this->log->LogError ("Ошибка запроса к БД: ". $this->lastSqlError[2]);
         } else {
             $this->lastStatement = $sth;
         }

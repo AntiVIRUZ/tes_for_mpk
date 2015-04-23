@@ -15,6 +15,8 @@ include_once 'JSONParser.php';
 include_once 'DBSaver.php';
 include_once 'CSVSaver.php';
 
+require_once 'KLogger.php';
+
 class Competition {
     
     /**
@@ -62,15 +64,29 @@ class Competition {
      * @var array
      */
     private $participants;
+    /**
+     * Экземпляр класса записи логов
+     * @var KLogger
+     */
+    private $log;
+    /**
+     * Константа - путь к лог файлу
+     */
+    const DEFAULT_LOG_FILE_PATH = "log.txt";
+    /**
+     * Уровень логирования по умолчанию. Равен KLogger::DEBUG
+     */
+    const DEFAULT_LOG_LEVEL = KLogger::DEBUG;
     
     /**
-     * Метод-конструктор. Инициализируем переменные получения и сохранения данных
+     * Метод-конструктор. Инициализируем переменные получения и сохранения данных, систему логирования
      */
     function __construct() {
         $this->XMLParser = new XMLParser();
         $this->JSONParser = new JSONParser();
         $this->DBSaver = new DBSaver();
         $this->CSVSaver = new CSVSaver();
+        $this->log = new KLogger(self::DEFAULT_LOG_FILE_PATH, self::DEFAULT_LOG_LEVEL);
     }
     
     /**
@@ -88,18 +104,19 @@ class Competition {
             case "json":
                 $this->activeParser =& $this->JSONParser;
                 break;
-            default:
-                echo "Неверный входной формат";
-                return false;
+            default :
+                $this->log->LogError("Ошибка: неверный формат входного файла (Competition::GetParticipantsFromURL)");
+                return FALSE;
                 break;
         }
-        try {
-            $this->participants = $this->activeParser->ParseFromUrl($url);
-            return true;
-        } catch (Exception $exc) {
-            echo $exc->getTraceAsString();
+        $result = $this->activeParser->ParseFromUrl($url);
+        if ($result !== false) {
+            $this->participants = $result;
+        } else {
+            $this->log->LogError($this->activeParser->GetLastError());
             return false;
         }
+        return true;
     }
     
     /**
@@ -108,8 +125,11 @@ class Competition {
      */
     public function CreateConnectionToDB() {
         if (!$this->DBSaver->ConnectToDB()) {
-            echo "Ошибка подключения к базе данных: ". $this->DBSaver->GetLastError();
+            $this->log->LogError("Ошибка подключения к СУБД: SQL". $this->DBSaver->GetLastSqlError());
+            $this->log->LogError("Объяснение: ".$this->DBSaver->GetLastError());
+            return FALSE;
         }
+        return TRUE;
     }
     
     /**
@@ -124,7 +144,8 @@ class Competition {
      */
     public function CreateConnectionToSpecificDB($dbType, $servername, $username, $password, $database) {
         if (!$this->DBSaver->ConnectToSpecificBD($dbType, $servername, $username, $password, $database)) {
-            echo "Ошибка подключения к базе данных: ". $this->DBSaver->GetLastError();
+            $this->log->LogError("Ошибка подключения к СУБД: SQL". $this->DBSaver->GetLastSqlError());
+            $this->log->LogError("Объяснение: ".$this->DBSaver->GetLastError());
             return false;
         }
         return true;
@@ -141,29 +162,26 @@ class Competition {
             case "db":
                 $this->activeSaver =& $this->DBSaver;
                 if (!$this->activeSaver->GetConnectionStatus()) {
-                    echo "Нет соединения с базой данных";
+                    $this->log->LogError("Нет соединения с базой данных");
                     return FALSE;
                 }
                 break;
             case "json":
                 $this->activeSaver =& $this->CSVSaver;
                 break;
-            default:
-                echo "Неверный формат сохранения";
-                return false;
+            default :
+                $this->log->LogError("Ошибка: неверный формат пути сохранения");
+                return FALSE;
                 break;
         }
-        try {
-            $this->activeSaver->SetParticipants($this->participants);
-            if (!$this->activeSaver->Save()) {
-                echo "Ошибка сохранения: ";
-                print_r($this->activeSaver->GetLastError());
-            }
-            return true;
-        } catch (Exception $exc) {
-            echo $exc->getTraceAsString();
+        
+        $this->activeSaver->SetParticipants($this->participants);
+        if (!$this->activeSaver->Save()) {
+            $this->log->LogError("Ошибка сохранения: SQL". $this->DBSaver->GetLastSqlError());
+            $this->log->LogError("Объяснение: ".$this->DBSaver->GetLastError());
             return false;
         }
+        return true;
     }
 }
 

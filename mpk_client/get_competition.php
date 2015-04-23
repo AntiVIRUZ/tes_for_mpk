@@ -11,8 +11,9 @@ if (!$clParser->setNewArguments($argv)) {
 $competition = new Competition();
 $competition->GetParticipantsFromURL($clParser->inputType, $clParser->url);
 if ($clParser->destination == "db" || $clParser->destination == "dbcsv") {
-    $competition->CreateConnectionToDB();
-    $competition->SaveParticipants("db");
+    if ($competition->CreateConnectionToDB()) {
+        if (!$competition->SaveParticipants("db")) echo "ERROR in saving\n";
+    } else echo "ERROR in connection\n";
 } else {
     $competition->SaveParticipants($clParser->destination);
 }

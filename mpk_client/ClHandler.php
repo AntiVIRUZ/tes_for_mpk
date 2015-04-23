@@ -6,6 +6,9 @@
  * Добавляет поддержку запуска скрипта из командной строки
  * @author Vasiliy Yatsevitch <zwtdbx@yandex.ru>
  */
+
+require_once 'KLogger.php';
+
 class ClHandler {
 
     /**
@@ -45,7 +48,18 @@ class ClHandler {
      * @var array 
      */
     private $destinations = array("db" => 1, "csv" => 1, "dbcsv" => 1);
+    /**
+     * Экземпляр класса записи логов
+     * @var KLogger
+     */
+    private $log;
     
+    /**
+     * Метод-конструктор. Инициализирует класс логирования
+     */
+    function __construct() {
+        $this->log = new KLogger(Competition::DEFAULT_LOG_FILE_PATH, Competition::DEFAULT_LOG_LEVEL);
+    }
     
     /**
      * Устанавливает новые аргументы
@@ -81,6 +95,7 @@ class ClHandler {
     private function CheckCount() {
         $argc = count($this->argv);
         if ($argc < 4) {
+            $this->log->LogError("Недостаточное количество аргументов");
             $this->ShowHelp();
             return FALSE;
         } else {
@@ -108,6 +123,7 @@ class ClHandler {
     private function CheckInputType() {
         if (!isset($this->inputTypes[$this->inputType])) {
             $this->ShowHelp();
+            $this->log->LogError("Неверный аргумент типа получаемых данных");
             return FALSE;
         } else {
             return TRUE;
@@ -124,6 +140,7 @@ class ClHandler {
     private function CheckDestination() {
         if (!isset($this->destinations[$this->destination])) {
             $this->ShowHelp();
+            $this->log->LogError("Неверный аргумент пути сохранения данных");
             return FALSE;
         } else {
             return TRUE;
