@@ -29,6 +29,11 @@ class DBSaver implements iSaver {
      * @access private
      * @var array 
      */
+    private $lastSqlError;
+    /**
+     * Человеческое объяснение места возникновения последней ошибки
+     * @var string
+     */
     private $lastError;
     /**
      * Экземпляр соединения с базой данных
@@ -76,7 +81,8 @@ class DBSaver implements iSaver {
         try {
             $this->dbSettings = new DBSettings();
         } catch (Exception $e) {
-            $this->log->LogError("Ошибка файла настроек. " . $e->getMessage() . " Доступно сохранение только по пользовательскому соединению");
+            $this->lastError = "Ошибка файла настроек. " . $e->getMessage() . " Доступно сохранение только по пользовательскому соединению";
+            $this->log->LogError($this->lastError);
         }
     }
 
@@ -97,6 +103,17 @@ class DBSaver implements iSaver {
      * @return array [0] - Код ошибки SQLSTATE (пятисимвольный код состоящий из букв и цифр, определенный в стандарте ANSI SQL).<br>
      * [1] - Код ошибки, возвращаемый драйвером.<br>
      * [2] - Сообщение об ошибке, выданное драйвером.
+     */
+    public function GetLastSqlError() {
+        $this->log->LogDebug($this->lastSqlError);
+        return $this->lastSqlError;
+    }
+    
+    /**
+     * Получить человеческое объяснение последней ошибки
+     * 
+     * @access public
+     * @return string Описание ошибки
      */
     public function GetLastError() {
         return $this->lastError;
@@ -137,7 +154,7 @@ class DBSaver implements iSaver {
     }
     
     /**
-     * Устанавливает соединение к базе данных с пользовательскими настройками
+     * Устанавливает соединение к СУБД с пользовательскими настройками и подготавливает базу данных для записи в нее.
      * @access public
      * @param string $dbType тип СУБД
      * @param string $servername адресс сервера
@@ -148,27 +165,21 @@ class DBSaver implements iSaver {
      */
     public function ConnectToSpecificBD($dbType, $servername, $username, $password, $database) {
         if (!$this->checkSupportingDBDriver($this->dbSettings->getDbType())) {
-            trigger_error("Драйвер базы данных не поддерживается или указан неверно", E_USER_ERROR);
+            $this->lastError = "Драйвер базы данных не поддерживается или указан неверно";
+            return FALSE;
         }
 
         if ($this->connectionStatus) {
             $this->DisconnectFromDB();
         }
 
-        $connectionString = $dbType . ":";
-        $connectionString .= "host=" . $servername;
-
-        try {
-            $this->pdo = new PDO($connectionString, $username, $password);
-        } catch (Exception $e) {
-            $this->lastError = $e->getMessage();
-            trigger_error("Ошибка инициализации драйвера PDO", E_USER_ERROR);
+        if (!$this->CreateConnection($dbType, $servername, $username, $password)) {
+            return FALSE;
         }
-
-        if (!$this->CreateDatabaseIfNotExists($database)) trigger_error("Не удалось создать базу данных", E_USER_ERROR);
-        if (!$this->SelectDatabase($database))            trigger_error("Ошибка подключения к базе данных", E_USER_ERROR);
-        if (!$this->DeleteTables())                       trigger_error("Ошибка удаления таблиц", E_USER_ERROR);
-        if (!$this->CreateTables())                       trigger_error("Ошибка создания таблиц", E_USER_ERROR);
+        if (!$this->PrepareDB($database)) {
+            return FALSE;
+        }
+        
         $this->connectionStatus = true;
         return true;
     }
@@ -184,6 +195,51 @@ class DBSaver implements iSaver {
         return $this->SentQuery("use `" . $name . "`;");
     }
 
+    /**
+     * Устанавливает соединение к СУБД
+     * @access public
+     * @param string $dbType тип СУБД
+     * @param string $servername адресс сервера
+     * @param string $username логин
+     * @param string $password пароль
+     * @param string $database название базы данных
+     * @return boolean TRUE если соединение установлено, FALSE в ином случае
+     */
+    private function CreateConnection($dbType, $servername, $username, $password) {
+        $connectionString = $dbType . ":";
+        $connectionString .= "host=" . $servername;
+
+        try {
+            $this->pdo = new PDO($connectionString, $username, $password);
+        } catch (Exception $e) {
+            $this->lastSqlError = $e->getMessage();
+            $this->lastError = "Ошибка инициализации драйвера PDO (DBSaver::CreateConnection)";
+            return FALSE;
+        }
+        
+        return TRUE;
+    }
+    
+    private function PrepareDB ($database) {
+        if (!$this->CreateDatabaseIfNotExists($database)) {
+            $this->lastError = "Не удалось создать базу данных (DBSaver::CreateDatabaseIfNotExists)";
+            return FALSE;
+        }
+        if (!$this->SelectDatabase($database)) {
+            $this->lastError = "Ошибка подключения к базе данных (DBSaver::SelectDatabase)";
+            return FALSE;
+        }
+        if (!$this->DeleteTables()) {
+            $this->lastError = "Ошибка удаления таблиц (DBSaver::DeleteTables)";
+            return FALSE;
+        }
+        if (!$this->CreateTables()) {
+            $this->lastError = "Ошибка создания таблиц (DBSaver::CreateTables)";
+            return FALSE;
+        }
+        return TRUE;
+    }
+    
     /**
      * Парсит список участников.
      * 
@@ -385,6 +441,8 @@ class DBSaver implements iSaver {
                     CONSTRAINT `mt2m` FOREIGN KEY (`member_id`) REFERENCES `members` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;";
         if (!$this->SentQuery($sql)) return FALSE;
+        
+        return true;
     }
 
     /**
@@ -395,9 +453,11 @@ class DBSaver implements iSaver {
         foreach (array_reverse($this->tables) as $table) {
             $sql = "DROP TABLE IF EXISTS `" . $table . "`;";
             if (!$this->SentQuery($sql)) {
-                trigger_error("Ошибка удаления таблицы", E_USER_ERROR);
+                $this->lastError = "Ошибка удаления таблицы";
+                return FALSE;
             }
         }
+        return TRUE;
     }
 
     /**
@@ -418,8 +478,9 @@ class DBSaver implements iSaver {
             $result = $sth->execute();
         }
         if (!$result) {
-            $this->lastError = $sth->errorInfo();
-            $this->log->LogError ("Ошибка запроса к БД: ". $this->lastError[2]);
+            $this->lastSqlError = $sth->errorInfo();
+            $this->lastError = "Ошибка запроса к БД (DBSaver::SentQuery)";
+            $this->log->LogError ("Ошибка запроса к БД: ". $this->lastSqlError[2]);
         } else {
             $this->lastStatement = $sth;
         }

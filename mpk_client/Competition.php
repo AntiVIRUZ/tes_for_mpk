@@ -124,8 +124,11 @@ class Competition {
      */
     public function CreateConnectionToDB() {
         if (!$this->DBSaver->ConnectToDB()) {
-            $this->log->LogError("Ошибка подключения к базе данных: ". $this->DBSaver->GetLastError());
+            $this->log->LogError("Ошибка подключения к СУБД: SQL". $this->DBSaver->GetLastSqlError());
+            $this->log->LogError("Объяснение: ".$this->DBSaver->GetLastError());
+            return FALSE;
         }
+        return TRUE;
     }
     
     /**
@@ -139,11 +142,9 @@ class Competition {
      * @return boolean TRUE если соединение установлено, FALSE в ином случае
      */
     public function CreateConnectionToSpecificDB($dbType, $servername, $username, $password, $database) {
-        try {
-            $this->DBSaver->ConnectToSpecificBD($dbType, $servername, $username, $password, $database);
-        } catch (Exception $e) {
-            $this->log->LogError("Ошибка подключения к СУБД: ". $e->getMessage());
-            $this->log->LogError(pritn_r($this->DBSaver->GetLastError(),true));
+        if (!$this->DBSaver->ConnectToSpecificBD($dbType, $servername, $username, $password, $database)) {
+            $this->log->LogError("Ошибка подключения к СУБД: SQL". $this->DBSaver->GetLastSqlError());
+            $this->log->LogError("Объяснение: ".$this->DBSaver->GetLastError());
             return false;
         }
         return true;
@@ -172,16 +173,14 @@ class Competition {
                 return FALSE;
                 break;
         }
-        try {
-            $this->activeSaver->SetParticipants($this->participants);
-            if (!$this->activeSaver->Save()) {
-                $this->log->LogError("Ошибка сохранения: ". print_r($this->activeSaver->GetLastError(), true));
-            }
-            return true;
-        } catch (Exception $exc) {
-            $this->log->LogError($exc->getTraceAsString());
-            return false;
+        
+        $this->activeSaver->SetParticipants($this->participants);
+        if (!$this->activeSaver->Save()) {
+            $this->log->LogError("Ошибка сохранения: SQL". $this->DBSaver->GetLastSqlError());
+        $this->log->LogError("Объяснение: ".$this->DBSaver->GetLastError());
+        return false;
         }
+        return true;
     }
 }
 
