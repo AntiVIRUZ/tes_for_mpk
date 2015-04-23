@@ -2,17 +2,35 @@
 
 include_once 'iSaver.php';
 
+/**
+ * Класс для сохранения списка участников в CSV файл
+ * 
+ * @author Vasiliy Yatsevitch <zwtdbx@yandex.ru>
+ */
 class CSVSaver implements iSaver {
 
+    /**
+     * Массив, хранящий список команд-участниц соревнования
+     * @access private
+     * @var array
+     */
     private $participants;
     
-    function __construct() {
-    }
-    
+    /**
+     * Установка нового спика участников
+     * @access public
+     * @param array $participants массив участников соревнования
+     */
     public function SetParticipants($participants) {
         $this->participants = $participants;
     }
     
+    /**
+     * Сохраняет список участников соревнования в CSV файлы
+     * 
+     * Создаются 4 файла по аналогии с SQL таблицами. Метод будет переработан
+     * @access public
+     */
     public function Save() {
         $SKfile = fopen("sports_kinds.csv", "w");
         foreach ($this->arr["sports_kinds"] as $key => $value){
