@@ -41,6 +41,9 @@ abstract class ParserAbstract {
      */
     public function parseFromUrl($url) {
         $xmlString = FilesLoader::LoadFile($url);
+        if ($xmlString === FALSE) {
+            $this->lastError = "Запрошенный файл не существует";
+        }
         return $this->parseFromString($xmlString);
     }
 
