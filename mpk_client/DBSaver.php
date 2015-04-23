@@ -61,17 +61,22 @@ class DBSaver implements iSaver {
      * @var array
      */
     private $tables = array( "sports_kinds", "members", "teams", "members_teams");
-
+    /**
+     *  Экземпляр класса записи логов
+     * @var KLogger
+     */
+    private $log;
+    
     /**
      * Метод-конструктор. Загружает настройки соединения по умолчанию
      */
     function __construct() {
         $this->connectionStatus = false;
+        $this->log = new KLogger(Competition::DEFAULT_LOG_FILE_PATH, Competition::DEFAULT_LOG_LEVEL);
         try {
             $this->dbSettings = new DBSettings();
         } catch (Exception $e) {
-            //@TODO Добавить логирование
-            die($e->getMessage());
+            $this->log->LogError("Ошибка файла настроек. " . $e->getMessage() . " Доступно сохранение только по пользовательскому соединению");
         }
     }
 
@@ -118,6 +123,7 @@ class DBSaver implements iSaver {
                 return FALSE;
             }
         }
+        
         return TRUE;
     }
 
@@ -149,24 +155,20 @@ class DBSaver implements iSaver {
             $this->DisconnectFromDB();
         }
 
-        $connectionString = $this->dbSettings->getDbType() . ":";
+        $connectionString = $dbType . ":";
         $connectionString .= "host=" . $servername;
 
         try {
             $this->pdo = new PDO($connectionString, $username, $password);
         } catch (Exception $e) {
-            //@TODO Добавить логирование
             $this->lastError = $e->getMessage();
-            return FAlSE;
+            trigger_error("Ошибка инициализации драйвера PDO", E_USER_ERROR);
         }
 
-        if ($this->CreateDatabaseIfNotExists($database)) {
-            $this->SelectDatabase($database);
-            $this->DeleteTables();
-            $this->CreateTables();
-        } else {
-            return false;
-        }
+        if (!$this->CreateDatabaseIfNotExists($database)) trigger_error("Не удалось создать базу данных", E_USER_ERROR);
+        if (!$this->SelectDatabase($database))            trigger_error("Ошибка подключения к базе данных", E_USER_ERROR);
+        if (!$this->DeleteTables())                       trigger_error("Ошибка удаления таблиц", E_USER_ERROR);
+        if (!$this->CreateTables())                       trigger_error("Ошибка создания таблиц", E_USER_ERROR);
         $this->connectionStatus = true;
         return true;
     }
@@ -290,7 +292,6 @@ class DBSaver implements iSaver {
         foreach ($values as $key => $value) {
             $values[$key]["id"] += $num;
         }
-        echo "num = " . $num;
     }
 
     /**
@@ -352,7 +353,7 @@ class DBSaver implements iSaver {
                     `name` varchar(50) NOT NULL,
                     PRIMARY KEY (`id`)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;";
-        $this->SentQuery($sql);
+        if (!$this->SentQuery($sql)) return FALSE;
 
         $sql = "CREATE TABLE IF NOT EXISTS `members` (
                     `id` int(11) NOT NULL AUTO_INCREMENT,
@@ -360,7 +361,7 @@ class DBSaver implements iSaver {
                     `passport` varchar(50) NOT NULL,
                     PRIMARY KEY (`id`)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;";
-        $this->SentQuery($sql);
+        if (!$this->SentQuery($sql)) return FALSE;
 
         $sql = "CREATE TABLE IF NOT EXISTS `teams` (
                     `id` int(11) NOT NULL AUTO_INCREMENT,
@@ -371,7 +372,7 @@ class DBSaver implements iSaver {
                     KEY `t2sk` (`sports_kind_id`),
                     CONSTRAINT `t2sk` FOREIGN KEY (`sports_kind_id`) REFERENCES `sports_kinds` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;";
-        $this->SentQuery($sql);
+        if (!$this->SentQuery($sql)) return FALSE;
 
         $sql = "CREATE TABLE IF NOT EXISTS `members_teams` (
                     `id` int(11) NOT NULL AUTO_INCREMENT,
@@ -383,7 +384,7 @@ class DBSaver implements iSaver {
                     CONSTRAINT `mt2t` FOREIGN KEY (`team_id`) REFERENCES `teams` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
                     CONSTRAINT `mt2m` FOREIGN KEY (`member_id`) REFERENCES `members` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;";
-        $this->SentQuery($sql);
+        if (!$this->SentQuery($sql)) return FALSE;
     }
 
     /**
@@ -394,7 +395,7 @@ class DBSaver implements iSaver {
         foreach (array_reverse($this->tables) as $table) {
             $sql = "DROP TABLE IF EXISTS `" . $table . "`;";
             if (!$this->SentQuery($sql)) {
-                trigger_error("Ошибка сохранения базы данных", E_USER_ERROR);
+                trigger_error("Ошибка удаления таблицы", E_USER_ERROR);
             }
         }
     }
@@ -417,8 +418,8 @@ class DBSaver implements iSaver {
             $result = $sth->execute();
         }
         if (!$result) {
-            print_r($sth->errorInfo());
             $this->lastError = $sth->errorInfo();
+            $this->log->LogError ("Ошибка запроса к БД: ". $this->lastError[2]);
         } else {
             $this->lastStatement = $sth;
         }

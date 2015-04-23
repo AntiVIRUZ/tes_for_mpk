@@ -104,6 +104,10 @@ class Competition {
             case "json":
                 $this->activeParser =& $this->JSONParser;
                 break;
+            default :
+                $this->log->LogError("Ошибка: неверный формат входного файла");
+                return FALSE;
+                break;
         }
         try {
             $this->participants = $this->activeParser->ParseFromUrl($url);
@@ -135,8 +139,11 @@ class Competition {
      * @return boolean TRUE если соединение установлено, FALSE в ином случае
      */
     public function CreateConnectionToSpecificDB($dbType, $servername, $username, $password, $database) {
-        if (!$this->DBSaver->ConnectToSpecificBD($dbType, $servername, $username, $password, $database)) {
-            $this->log->LogError("Ошибка подключения к базе данных: ". $this->DBSaver->GetLastError());
+        try {
+            $this->DBSaver->ConnectToSpecificBD($dbType, $servername, $username, $password, $database);
+        } catch (Exception $e) {
+            $this->log->LogError("Ошибка подключения к СУБД: ". $e->getMessage());
+            $this->log->LogError(pritn_r($this->DBSaver->GetLastError(),true));
             return false;
         }
         return true;
@@ -159,6 +166,10 @@ class Competition {
                 break;
             case "json":
                 $this->activeSaver =& $this->CSVSaver;
+                break;
+            default :
+                $this->log->LogError("Ошибка: неверный формат пути сохранения");
+                return FALSE;
                 break;
         }
         try {
