@@ -18,6 +18,7 @@ class CSVSaver implements iSaver {
     
     /**
      * Установка нового спика участников
+     * @access public
      * @param array $participants массив участников соревнования
      */
     public function SetParticipants($participants) {
@@ -28,6 +29,7 @@ class CSVSaver implements iSaver {
      * Сохраняет список участников соревнования в CSV файлы
      * 
      * Создаются 4 файла по аналогии с SQL таблицами. Метод будет переработан
+     * @access public
      */
     public function Save() {
         $SKfile = fopen("sports_kinds.csv", "w");

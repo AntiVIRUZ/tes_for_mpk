@@ -5,6 +5,7 @@
  * 
  * Работает с любой СУБД, поддерживаемой технологией PDO, при уловии,
  * что в PHP установлен соответствующий драйвер
+ * @author Vasiliy Yatsevitch <zwtdbx@yandex.ru>
  */
 
 include_once 'iSaver.php';
@@ -76,6 +77,7 @@ class DBSaver implements iSaver {
 
     /**
      * Получить статус подключения к БД
+     * @access public
      * @return boolean TRUE - подключено, FALSE - отключено
      */
     public function GetConnectionStatus() {
@@ -97,6 +99,7 @@ class DBSaver implements iSaver {
 
     /**
      * Устанавливает список участников для дальнейшего сохранения
+     * @access public
      * @param array $participants Массив команд (экземпляров класса Team)
      */
     public function SetParticipants($participants) {
@@ -105,6 +108,7 @@ class DBSaver implements iSaver {
 
     /**
      * Сохраняет список участников в базу данных
+     * @access public
      * @return boolean TRUE если сохранение прошло удачно, FALSE в ином случае
      * @todo Написать обработкуошибок сохранения и откат после них.
      */
@@ -119,6 +123,7 @@ class DBSaver implements iSaver {
 
     /**
      * Устанавливает соединение к базе данных с настройками по умолчанию
+     * @access public
      * @return boolean TRUE при успешном соединенит, FALSE в ином случае
      */
     public function ConnectToDB() {
@@ -127,6 +132,7 @@ class DBSaver implements iSaver {
     
     /**
      * Устанавливает соединение к базе данных с пользовательскими настройками
+     * @access public
      * @param string $dbType тип СУБД
      * @param string $servername адресс сервера
      * @param string $username логин
@@ -167,6 +173,7 @@ class DBSaver implements iSaver {
 
     /**
      * Выбирает базу данных
+     * @access public
      * @param string $name имя базы данных
      * @return boolean true если база данных успешно выбрана, false в ином случае
      * @todo изменить запрос к БД на изменение переменной $database. Написать другую приватную функцию с этим запросом
@@ -179,6 +186,7 @@ class DBSaver implements iSaver {
      * Парсит список участников.
      * 
      * Парсит из массива команд (Team) в представление, соответствующее представлению базы данных
+     * @access private
      * @param array $array Массив команд (Team)
      * @return array массив соответствующий по структуре БД 
      */
@@ -227,6 +235,7 @@ class DBSaver implements iSaver {
      * Ищет среди массива элемента со значением $name в поле "name"
      * 
      * Используйте строгое (===) сравнения для проверки найден элемент, или нет, так как возвращаемый ключ может быть равен нулю
+     * @access private
      * @param array $array Массив для поиска
      * @param string $name Значение поля
      * @return mixed ключ элемента, если найден, FALSE, если не найден
@@ -244,6 +253,7 @@ class DBSaver implements iSaver {
      * 
      * Элементы массива должены быть массивами, составлеными в виде $key => $value,
      * где $key - столбец таблицы, а $value - значение
+     * @access private
      * @param string $name Имя таблицы
      * @param array $values Массив значений
      * @return boolean TRUE, если сохранение прошло удачно, FALSE в противном случае
@@ -272,6 +282,7 @@ class DBSaver implements iSaver {
 
     /**
      * Увеличивает поле "id" всех элементов массива $values на значние $num
+     * @access private
      * @param array $values массив элементов
      * @param int $num значение инкремента
      */
@@ -284,6 +295,7 @@ class DBSaver implements iSaver {
 
     /**
      * Получает максимальное значение столбца "id" таблицы $name
+     * @access private
      * @param string $name название таблицы
      * @return int максимальное значение столбца "id"
      */
@@ -297,6 +309,7 @@ class DBSaver implements iSaver {
 
     /**
      * Проверяет, поддерживает ли PHP драйвер $driverName
+     * @access private
      * @param string $driverName Имя драйвера СУБД
      * @return boolean TRUE, если PHP поддерживает драйвер, FALSE в противном случае
      */
@@ -311,6 +324,7 @@ class DBSaver implements iSaver {
 
     /**
      * Разрывает соединение с БД
+     * @access private
      */
     private function DisconnectFromDB() {
         $this->pdo = NULL;
@@ -318,6 +332,7 @@ class DBSaver implements iSaver {
 
     /**
      * Создает базу данных с названием $database, если такая не существует
+     * @access private
      * @param string $database название базы данных
      * @return boolean TRUE, если база данных успешно создана, FALSE в противном случае
      */
@@ -327,6 +342,8 @@ class DBSaver implements iSaver {
 
     /**
      * Создает таблицы связанные с соревнованием для последующего сохранения в них информации
+     * @access private
+     * @todo сделать механизм отслеживания ошибок и отката изменений
      */
     private function CreateTables() {
 
@@ -371,6 +388,7 @@ class DBSaver implements iSaver {
 
     /**
      * Удаляет таблицы, связанные с соревнованием
+     * @access private
      */
     private function DeleteTables() {
         foreach (array_reverse($this->tables) as $table) {
@@ -385,6 +403,7 @@ class DBSaver implements iSaver {
      * Посылает SQL запрос в БД
      * 
      * Используется метод PDO::prepare 
+     * @access private
      * @link http://php.net/manual/ru/pdostatement.execute.php Смотри подробнее
      * @param string $sql SQL запрос
      * @param array $input_params массив входных параметров SQL запроса
