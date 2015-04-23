@@ -78,11 +78,8 @@ class DBSaver implements iSaver {
     function __construct() {
         $this->connectionStatus = false;
         $this->log = new KLogger(Competition::DEFAULT_LOG_FILE_PATH, Competition::DEFAULT_LOG_LEVEL);
-        try {
-            $this->dbSettings = new DBSettings();
-        } catch (Exception $e) {
-            $this->lastError = "Ошибка файла настроек. " . $e->getMessage() . " Доступно сохранение только по пользовательскому соединению";
-            $this->log->LogError($this->lastError);
+        if (!$this->LoadSettingsFile()) {
+            return false;
         }
     }
 
@@ -196,8 +193,23 @@ class DBSaver implements iSaver {
     }
 
     /**
+     * Создает экземпляр класса настроек и загружает настройки
+     * @access private
+     * @return boolean TRUE если настройки успешно загружены, FALSE в ином случае
+     */
+    private function LoadSettingsFile() {
+        $this->dbSettings = new DBSettings();
+        if (!$this->dbSettings->LoadSettings()) {
+            $this->lastError = "Ошибка файла настроек. " . $this->dbSettings->GetLastError() . " Доступно сохранение только по пользовательскому соединению";
+            $this->log->LogError($this->lastError);
+            return false;
+        }
+        return true;
+    }
+    
+    /**
      * Устанавливает соединение к СУБД
-     * @access public
+     * @access private
      * @param string $dbType тип СУБД
      * @param string $servername адресс сервера
      * @param string $username логин
@@ -220,6 +232,14 @@ class DBSaver implements iSaver {
         return TRUE;
     }
     
+    /**
+     * Подготовка базы данных после подключение
+     * 
+     * Производится создание БД и смена активной БД, удаляются старые таблицы и создаются новые
+     * @access private
+     * @param string $database Имя базы данных
+     * @return boolean TRUE если все операции прошли успешно, FALSE в ином случае
+     */
     private function PrepareDB ($database) {
         if (!$this->CreateDatabaseIfNotExists($database)) {
             $this->lastError = "Не удалось создать базу данных (DBSaver::CreateDatabaseIfNotExists)";

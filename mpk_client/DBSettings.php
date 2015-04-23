@@ -42,12 +42,16 @@ class DBSettings {
      * @var string
      */
     private $database;
+    /**
+     * Описание последней ошибки
+     * @var string
+     */
+    private $lastError;
 
     /**
      * Метод-конструктор. Загружает данные из файла
      */
     public function __construct() {
-        $this->LoadSettings();
     }
 
     /**
@@ -55,14 +59,27 @@ class DBSettings {
      */
     public function LoadSettings() {
         $settings = parse_ini_file($this->configFile);
-        $this->CheckIniFile($settings);
+        if (!$this->CheckIniFile($settings)) {
+            return false;
+        }
         $this->dbType = $settings["dbType"];
         $this->servername = $settings["servername"];
         $this->username = $settings["username"];
         $this->password = $settings["password"];
         $this->database = $settings["database"];
+        return true;
     }
 
+    /**
+     * Получить описание последней ошибки
+     * 
+     * @access public
+     * @return string Описание ошибки
+     */
+    public function GetLastError() {
+        return $this->lastError;
+    }
+    
     /**
      * Проверяет полноту файла настроек
      * @access private
@@ -70,21 +87,27 @@ class DBSettings {
      */
     private function CheckIniFile($settings) {
         if ($settings === FALSE) {
-            trigger_error("Отсутствует файл настроек", E_USER_ERROR);
+            $this->lastError = "Отсутствует файл настроек";
+            return FALSE;
         } else {
             if (!isset($settings["dbType"])) {
-                trigger_error("Отсутствует название драйвера базы данных", E_USER_ERROR);
+                $this->lastError = "Отсутствует название драйвера базы данных";
+                return FALSE;
             }
             if (!isset($settings["servername"])) {
-                trigger_error("Отсутствует адресс сервера", E_USER_ERROR);
+                $this->lastError = "Отсутствует адресс сервера";
+                return FALSE;
             }
             if (!isset($settings["username"])) {
-                trigger_error("Отсутствует логин", E_USER_ERROR);
+                $this->lastError = "Отсутствует логин";
+                return FALSE;
             }
             if (!isset($settings["password"])) {
-                trigger_error("Отсутствует пароль", E_USER_ERROR);
+                $this->lastError = "Отсутствует пароль";
+                return FALSE;
             }
         }
+        return true;
     }
 
     /**
