@@ -1,6 +1,7 @@
 <?php
 
 include_once 'iSaver.php';
+include_once 'CSVSettings.php';
 
 /**
  * Класс для сохранения списка участников в CSV файл

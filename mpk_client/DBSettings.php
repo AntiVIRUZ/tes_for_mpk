@@ -4,14 +4,11 @@
  * Класс, загружающий и хранящий нстройки подключения к базе данных
  * @author Vasiliy Yatsevitch <zwtdbx@yandex.ru>
  */
-class DBSettings {
 
-    /**
-     * Путь к конфиг файлу
-     * @access private
-     * @var string
-     */
-    private $configFile = "config.ini";
+include_once 'SettingsAbstract.php';
+
+class DBSettings extends SettingsAbstract {
+
     /**
      * Тип драйвера базы данных
      * @access private
@@ -42,23 +39,14 @@ class DBSettings {
      * @var string
      */
     private $database;
-    /**
-     * Описание последней ошибки
-     * @var string
-     */
-    private $lastError;
-
-    /**
-     * Метод-конструктор. Загружает данные из файла
-     */
-    public function __construct() {
-    }
-
+    
     /**
      * Загружает данные из файла $configFile и помещает их в поля класса
+     * @access public
+     * @return boolean TRUE если настройки успешно загружены, FALSE в ином случае
      */
     public function LoadSettings() {
-        $settings = parse_ini_file($this->configFile);
+        $settings = parse_ini_file(parent::CONFIG_FILE);
         if (!$this->CheckIniFile($settings)) {
             return false;
         }
@@ -69,23 +57,14 @@ class DBSettings {
         $this->database = $settings["database"];
         return true;
     }
-
-    /**
-     * Получить описание последней ошибки
-     * 
-     * @access public
-     * @return string Описание ошибки
-     */
-    public function GetLastError() {
-        return $this->lastError;
-    }
     
     /**
      * Проверяет полноту файла настроек
      * @access private
      * @param array $settings массив настроек
+     * @return boolean TRUE если настройки заданны корректно, FALSE в ином случае
      */
-    private function CheckIniFile($settings) {
+    protected function CheckIniFile($settings) {
         if ($settings === FALSE) {
             $this->lastError = "Отсутствует файл настроек";
             return FALSE;
