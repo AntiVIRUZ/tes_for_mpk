@@ -1,6 +1,6 @@
 <?php
 
-include_once 'iSaver.php';
+include_once 'DBLikeSaverAbstract.php';
 include_once 'CSVSettings.php';
 
 /**
@@ -8,23 +8,7 @@ include_once 'CSVSettings.php';
  * 
  * @author Vasiliy Yatsevitch <zwtdbx@yandex.ru>
  */
-class CSVSaver implements iSaver {
-
-    /**
-     * Массив, хранящий список команд-участниц соревнования
-     * @access private
-     * @var array
-     */
-    private $participants;
-    
-    /**
-     * Установка нового спика участников
-     * @access public
-     * @param array $participants массив участников соревнования
-     */
-    public function SetParticipants($participants) {
-        $this->participants = $participants;
-    }
+class CSVSaver extends DBLikeSaverAbstract {
     
     /**
      * Сохраняет список участников соревнования в CSV файлы
@@ -33,29 +17,28 @@ class CSVSaver implements iSaver {
      * @access public
      */
     public function Save() {
-        $SKfile = fopen("sports_kinds.csv", "w");
-        foreach ($this->arr["sports_kinds"] as $key => $value){
-            fwrite($SKfile, $value["id"].";\"".$value["name"]."\"\n");
+        $SKfile = fopen($this->dbSettings->GetCsvPath()."sports_kinds.csv", "w");
+        foreach ($this->participants["sports_kinds"] as $fields) {
+            fputcsv($SKfile, $fields, $this->dbSettings->GetDelimeter());
         }
         fclose($SKfile);
         
-        $Tfile = fopen("teams.csv", "w");
-        foreach ($this->arr["teams"] as $key => $value){
-            fwrite($Tfile, $value["id"].";\"".$value["name"]."\",".$value["sports_kind_id"]."\n");
+        $Tfile = fopen($this->dbSettings->GetCsvPath()."teams.csv", "w");
+        foreach ($this->participants["teams"] as $fields) {
+            fputcsv($Tfile, $fields, $this->dbSettings->GetDelimeter());
         }
         fclose($Tfile);
         
-        $Pfile = fopen("participants.csv", "w");
-        foreach ($this->arr["participants"] as $key => $value){
-            fwrite($Pfile, $value["id"].";\"".$value["name"]."\"\n");
+        $Pfile = fopen($this->dbSettings->GetCsvPath()."members.csv", "w");
+        foreach ($this->participants["members"] as $fields) {
+            fputcsv($Pfile, $fields, $this->dbSettings->GetDelimeter());
         }
         fclose($Pfile);
         
-        $PTfile = fopen("participants to teams.csv", "w");
-        foreach ($this->arr["participants"] as $key => $value)
-        foreach ($value["teams"] as $team_value) {
-            fwrite($PTfile, $value["id"].";".$team_value."\n");
+        $MTfile = fopen($this->dbSettings->GetCsvPath()."members_teams.csv", "w");
+        foreach ($this->participants["members_teams"] as $fields) {
+            fputcsv($MTfile, $fields, $this->dbSettings->GetDelimeter());
         }
-        fclose($PTfile);
+        fclose($MTfile);
     }
 }

@@ -8,19 +8,11 @@
  * @author Vasiliy Yatsevitch <zwtdbx@yandex.ru>
  */
 
-include_once 'iSaver.php';
+include_once 'DBLikeSaverAbstract.php';
 include_once 'DBSettings.php';
 
-class DBSaver implements iSaver {
+class DBSaver extends DBLikeSaverAbstract {
 
-    /**
-     * Список участников соревнования
-     * 
-     * Хранится в формате, соответствующем формату БД
-     * @access private
-     * @var array
-     */
-    private $participants;
     /**
      * Последняя ошибка, возникшая при отправке запроса БД<br>
      * [0] - Код ошибки SQLSTATE (пятисимвольный код состоящий из букв и цифр, определенный в стандарте ANSI SQL).<br>
@@ -30,11 +22,6 @@ class DBSaver implements iSaver {
      * @var array 
      */
     private $lastSqlError;
-    /**
-     * Человеческое объяснение места возникновения последней ошибки
-     * @var string
-     */
-    private $lastError;
     /**
      * Экземпляр соединения с базой данных
      * @access private
@@ -49,23 +36,11 @@ class DBSaver implements iSaver {
      */
     private $connectionStatus;
     /**
-     * Экземпляр класса настроек подключения по умолчанию
-     * @access private
-     * @var DBSettings
-     */
-    private $dbSettings;
-    /**
      * Последний результирующий набор запроса к БД 
      * @access private
      * @var PDOStatement
      */
     private $lastStatement;
-    /**
-     * Список таблиц в порядке занесения значений (для сохранения целостности ключей)
-     * @access private
-     * @var array
-     */
-    private $tables = array( "sports_kinds", "members", "teams", "members_teams");
     /**
      *  Экземпляр класса записи логов
      * @var KLogger
@@ -78,9 +53,6 @@ class DBSaver implements iSaver {
     function __construct() {
         $this->connectionStatus = false;
         $this->log = new KLogger(Competition::DEFAULT_LOG_FILE_PATH, Competition::DEFAULT_LOG_LEVEL);
-        if (!$this->LoadSettingsFile()) {
-            return false;
-        }
     }
 
     /**
@@ -102,27 +74,7 @@ class DBSaver implements iSaver {
      * [2] - Сообщение об ошибке, выданное драйвером.
      */
     public function GetLastSqlError() {
-        $this->log->LogDebug($this->lastSqlError);
         return $this->lastSqlError;
-    }
-    
-    /**
-     * Получить человеческое объяснение последней ошибки
-     * 
-     * @access public
-     * @return string Описание ошибки
-     */
-    public function GetLastError() {
-        return $this->lastError;
-    }
-
-    /**
-     * Устанавливает список участников для дальнейшего сохранения
-     * @access public
-     * @param array $participants Массив команд (экземпляров класса Team)
-     */
-    public function SetParticipants($participants) {
-        $this->participants = $this->ParseFromTeams($participants);
     }
 
     /**
@@ -192,20 +144,7 @@ class DBSaver implements iSaver {
         return $this->SentQuery("use `" . $name . "`;");
     }
 
-    /**
-     * Создает экземпляр класса настроек и загружает настройки
-     * @access private
-     * @return boolean TRUE если настройки успешно загружены, FALSE в ином случае
-     */
-    private function LoadSettingsFile() {
-        $this->dbSettings = new DBSettings();
-        if (!$this->dbSettings->LoadSettings()) {
-            $this->lastError = "Ошибка файла настроек. " . $this->dbSettings->GetLastError() . " Доступно сохранение только по пользовательскому соединению";
-            $this->log->LogError($this->lastError);
-            return false;
-        }
-        return true;
-    }
+    
     
     /**
      * Устанавливает соединение к СУБД
@@ -258,72 +197,6 @@ class DBSaver implements iSaver {
             return FALSE;
         }
         return TRUE;
-    }
-    
-    /**
-     * Парсит список участников.
-     * 
-     * Парсит из массива команд (Team) в представление, соответствующее представлению базы данных
-     * @access private
-     * @param array $array Массив команд (Team)
-     * @return array массив соответствующий по структуре БД 
-     */
-    private function ParseFromTeams($array) {
-        $sportsKindsNumber = 0;
-        $membersNumber = 0;
-        $teamsNumber = 0;
-        $membersToTeamsNumber = 0;
-        $sportsKindsId;
-        $memberList;
-
-        $result = array();
-        foreach ($this->tables as $value) {
-            $result[$value] = array();
-        }
-
-        foreach ($array as $value) {
-            $sportsKindsId = $this->SearchByName($result["sports_kinds"], $value->sportsKind);
-            if ($sportsKindsId === FALSE) {
-                $sportsKindsNumber++;
-                $sportsKindsId = $sportsKindsNumber;
-                $result["sports_kinds"][$sportsKindsNumber] = array("id" => $sportsKindsNumber, "name" => $value->sportsKind);
-            }
-
-            $teamsNumber++;
-            $result["teams"][$teamsNumber] = array("id" => $teamsNumber, "name" => $value->name, "sports_kind_id" => $sportsKindsId, "motto" => $value->motto);
-
-            $memberList = $value->GetMembersList();
-            foreach ($memberList as $memberName) {
-                $memberId = $this->SearchByName($result["members"], $memberName);
-                if ($memberId === FALSE) {
-                    $member = $value->GetMemberBy($memberName, "name");
-                    $membersNumber++;
-                    $memberId = $membersNumber;
-                    $result["members"][$membersNumber] = array("id" => $membersNumber, "name" => $member->name, "passport" => $member->passport);
-                }
-
-                $membersToTeamsNumber++;
-                $result["members_teams"][$membersToTeamsNumber] = array("id" => $membersToTeamsNumber, "member_id" => $memberId, "team_id" => $teamsNumber);
-            }
-        }
-        return $result;
-    }
-
-    /**
-     * Ищет среди массива элемента со значением $name в поле "name"
-     * 
-     * Используйте строгое (===) сравнения для проверки найден элемент, или нет, так как возвращаемый ключ может быть равен нулю
-     * @access private
-     * @param array $array Массив для поиска
-     * @param string $name Значение поля
-     * @return mixed ключ элемента, если найден, FALSE, если не найден
-     */
-    private function SearchByName($array, $name) {
-        foreach ($array as $key => $value) {
-            if ($value["name"] == $name)
-                return $key;
-        }
-        return FALSE;
     }
 
     /**
